@@ -25,28 +25,26 @@ class Game {
             "                    +--------+"
         ];
 
-        // 更新位置系统以匹配新地图
+        // 更新位置系统
         this.locations = {
-            // Bedroom
+            // Rooms
+            "BEDROOM": { x: 6, y: 2 },
+            "STUDY": { x: 17, y: 2 },
+            "BATHROOM": { x: 25, y: 2 },
+            "KITCHEN": { x: 24, y: 11 },
+            "LIVING": { x: 18, y: 7 },
+            "BALCONY": { x: 4, y: 9 },
+            
+            // Items in rooms
             "BED": { x: 2, y: 2 },
             "WARDROBE": { x: 10, y: 2 },
-            
-            // Study
             "DESK": { x: 15, y: 2 },
             "BOOKSHELF": { x: 21, y: 2 },
-            
-            // Bathroom
             "SHOWER": { x: 26, y: 2 },
-            
-            // Kitchen
             "FRIDGE": { x: 26, y: 11 },
             "STOVE": { x: 23, y: 11 },
-            
-            // Living Room
             "SOFA": { x: 15, y: 6 },
             "TV": { x: 21, y: 6 },
-            
-            // Balcony
             "PLANTS": { x: 2, y: 8 },
             "CHAIR": { x: 4, y: 8 }
         };
@@ -72,14 +70,6 @@ class Game {
         this.updateMap();
         console.log('Initial map update called');
 
-        // 设置事件监听
-        this.commandInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                this.handleCommand(e.target.value);
-                e.target.value = '';
-            }
-        });
-
         // 初始化游戏
         this.updateMap();
         this.updateStatus();
@@ -88,6 +78,20 @@ class Game {
         this.log('SYSTEM', 'Type "help" for available commands');
         this.log('SYSTEM', 'Current location: ' + this.state.position);
         this.log('SYSTEM', 'Map Legend: @ marks your current position');
+
+        // 显示欢迎信息
+        this.log('SYSTEM', '=== Welcome to Programmer\'s Life Simulator ===');
+        this.log('SYSTEM', 'Press ENTER to start the tutorial...');
+        
+        // 等待用户按Enter开始教程
+        const startTutorial = (e) => {
+            if (e.key === 'Enter') {
+                this.commandInput.removeEventListener('keypress', startTutorial);
+                this.showTutorial();
+            }
+        };
+        
+        this.commandInput.addEventListener('keypress', startTutorial);
     }
 
     handleCommand(command) {
@@ -114,20 +118,45 @@ class Game {
             case 'move':
                 this.movePlayer(args);
                 break;
-            case 'eat':
-                this.eat();
+            case 'status':
+                this.showStatus();
                 break;
+            case 'scan':
+                this.scanSurroundings();
+                break;
+            // 添加所有交互命令
             case 'sleep':
                 this.sleep();
                 break;
             case 'shower':
                 this.shower();
                 break;
-            case 'status':
-                this.showStatus();
+            case 'eat':
+                this.eat();
                 break;
-            case 'scan':
-                this.scanSurroundings();
+            case 'work':
+                this.work();
+                break;
+            case 'watchtv':
+                this.watchTV();
+                break;
+            case 'waterplants':
+                this.waterPlants();
+                break;
+            case 'changeclothes':
+                this.changeClothes();
+                break;
+            case 'relax':
+                this.relax();
+                break;
+            case 'read':
+                this.read();
+                break;
+            case 'cook':
+                this.cook();
+                break;
+            case 'washhands':
+                this.washHands();
                 break;
             default:
                 this.log('ERROR', `Unknown command: ${cmd}`);
@@ -159,16 +188,40 @@ class Game {
         // 创建地图副本
         let currentMap = [...this.map];
         
-        // 在当前位置添加闪烁的标记 (@)
+        // 在当前位置添加带颜色的标记 (@)
         const pos = this.locations[this.state.position];
         if (pos) {
-            let line = currentMap[pos.y];
-            currentMap[pos.y] = line.substring(0, pos.x) + '@' + line.substring(pos.x + 1);
+            // 清空原有内容
+            this.asciiMap.innerHTML = '';
+            
+            // 分三部分添加：标记位置之前的内容、标记、标记位置之后的内容
+            for (let i = 0; i < currentMap.length; i++) {
+                if (i === pos.y) {
+                    const line = currentMap[i];
+                    const before = line.substring(0, pos.x);
+                    const after = line.substring(pos.x + 1);
+                    
+                    const span = document.createElement('span');
+                    span.textContent = before;
+                    this.asciiMap.appendChild(span);
+                    
+                    const playerSpan = document.createElement('span');
+                    playerSpan.textContent = '@';
+                    playerSpan.className = 'player-position';
+                    this.asciiMap.appendChild(playerSpan);
+                    
+                    const endSpan = document.createElement('span');
+                    endSpan.textContent = after + '\n';
+                    this.asciiMap.appendChild(endSpan);
+                } else {
+                    const span = document.createElement('span');
+                    span.textContent = currentMap[i] + '\n';
+                    this.asciiMap.appendChild(span);
+                }
+            }
+        } else {
+            this.asciiMap.textContent = currentMap.join('\n');
         }
-
-        // 确保地图正确显示
-        this.asciiMap.textContent = currentMap.join('\n');
-        console.log('Map updated:', currentMap.join('\n')); // 调试信息
     }
 
     updateStatus() {
@@ -225,18 +278,84 @@ class Game {
             this.log('ERROR', 'Please specify a location');
             return;
         }
-        
-        this.log('SYSTEM', `Available locations: ${Object.keys(this.locations).join(', ')}`);
-        
-        if (!this.locations[location]) {
-            this.log('ERROR', `Invalid location: ${location}`);
-            this.log('SYSTEM', 'Valid locations are: bed, desk, bath, fridge');
-            return;
+
+        // 定义房间和其包含的物品
+        const rooms = {
+            'BEDROOM': {
+                description: 'You are in the bedroom. You can move to:',
+                items: {
+                    'BED': 'sleep() to restore mental health',
+                    'WARDROBE': 'changeClothes() to improve cleanliness'
+                }
+            },
+            'STUDY': {
+                description: 'You are in the study. You can move to:',
+                items: {
+                    'DESK': 'work() to code and earn money',
+                    'BOOKSHELF': 'read() to gain knowledge'
+                }
+            },
+            'BATHROOM': {
+                description: 'You are in the bathroom. You can move to:',
+                items: {
+                    'SHOWER': 'shower() to improve cleanliness'
+                }
+            },
+            'KITCHEN': {
+                description: 'You are in the kitchen. You can move to:',
+                items: {
+                    'FRIDGE': 'eat() to restore hunger',
+                    'STOVE': 'cook() for a better meal'
+                }
+            },
+            'LIVING': {
+                description: 'You are in the living room. You can move to:',
+                items: {
+                    'SOFA': 'watchTV() to relax',
+                    'TV': 'watchTV() to relax'
+                }
+            },
+            'BALCONY': {
+                description: 'You are on the balcony. You can move to:',
+                items: {
+                    'PLANTS': 'waterPlants() to improve mood',
+                    'CHAIR': 'relax() to enjoy fresh air'
+                }
+            }
+        };
+
+        // 检查是否是房间名
+        if (rooms.hasOwnProperty(location)) {
+            const room = rooms[location];
+            this.state.position = location;
+            this.log('SYSTEM', `Successfully moved to ${location}`);
+            this.log('SYSTEM', room.description);
+            
+            // 列出房间内可用的物品和操作
+            Object.entries(room.items).forEach(([item, action]) => {
+                this.log('SYSTEM', `- move.to(${item}) to ${action}`);
+            });
+            
+            this.updateMap();
         }
-        
-        this.state.position = location;
-        this.log('SYSTEM', `Successfully moved to ${location}`);
-        this.updateMap();
+        // 检查是否是具体物品
+        else if (Object.values(rooms).some(room => room.items.hasOwnProperty(location))) {
+            this.state.position = location;
+            this.log('SYSTEM', `Moved to ${location}`);
+            
+            // 显示当前位置可以执行的操作
+            Object.entries(rooms).forEach(([roomName, room]) => {
+                if (room.items.hasOwnProperty(location)) {
+                    this.log('SYSTEM', `You can ${room.items[location]}`);
+                }
+            });
+            
+            this.updateMap();
+        }
+        else {
+            this.log('ERROR', `Invalid location: ${location}`);
+            this.log('SYSTEM', 'Valid rooms are: BEDROOM, STUDY, BATHROOM, KITCHEN, LIVING, BALCONY');
+        }
     }
 
     eat() {
@@ -440,6 +559,137 @@ class Game {
             this.updateStatus();
             this.log('SYSTEM', 'Fresh air and city views are refreshing!');
         }, 3000);
+    }
+
+    // 添加新的教程方法
+    showTutorial() {
+        const tutorial = [
+            {
+                title: 'Basic Controls Guide',
+                content: [
+                    'Welcome to the Programmer\'s Life Simulator. You need to balance your basic needs while coding.',
+                    'The @ symbol on the map marks your current position.',
+                    'You can use these basic commands:',
+                    '1. move.to(location) - Move to a specific location',
+                    '2. status() - Check your current status',
+                    '3. scan() - Look around your environment',
+                    '4. help - Show all available commands'
+                ]
+            },
+            {
+                title: 'Rooms and Locations',
+                content: [
+                    'The house is divided into these areas:',
+                    '- Bedroom: Has a bed(BED) and wardrobe(WARDROBE)',
+                    '- Study: Has a desk(DESK) and bookshelf(BOOKSHELF)',
+                    '- Bathroom: Has a shower(SHOWER)',
+                    '- Kitchen: Has a fridge(FRIDGE) and stove(STOVE)',
+                    '- Living Room: Has a sofa(SOFA) and TV(TV)',
+                    '- Balcony: Has plants(PLANTS) and chair(CHAIR)'
+                ]
+            },
+            {
+                title: 'Daily Activities',
+                content: [
+                    'Different locations allow different activities:',
+                    '- At bed: sleep() - Restore mental health',
+                    '- At shower: shower() - Improve cleanliness',
+                    '- At fridge: eat() - Restore hunger',
+                    '- At desk: work() - Code and work',
+                    '- At sofa: watchTV() - Relax',
+                    '- At balcony: relax() - Enjoy fresh air'
+                ]
+            },
+            {
+                title: 'Status Management',
+                content: [
+                    'You need to monitor these status bars:',
+                    '- Hunger: Need regular meals from fridge',
+                    '- Clean: Need showers and change of clothes',
+                    '- Sanity: Need rest and entertainment',
+                    'You\'ll receive warnings when any status drops below 20%'
+                ]
+            },
+            {
+                title: 'Example Actions',
+                content: [
+                    'For example, to go to sleep:',
+                    '1. Type move.to(bed) to move to the bed',
+                    '2. Type sleep() to start sleeping',
+                    '',
+                    'To take a shower:',
+                    '1. Type move.to(shower) to move to the shower',
+                    '2. Type shower() to start showering'
+                ]
+            }
+        ];
+
+        let currentSection = 0;
+        let currentLine = 0;
+        
+        // 保存原始的命令处理器
+        const originalHandler = this.commandInput.onkeypress;
+        const originalHandleCommand = this.handleCommand.bind(this);
+        
+        // 临时替换handleCommand方法
+        this.handleCommand = () => {
+            // 在教程模式下不处理命令
+        };
+        
+        const showNextLine = () => {
+            if (currentSection >= tutorial.length) {
+                // 教程结束，恢复原始命令处理
+                this.log('SYSTEM', 'Tutorial completed! Try typing "help" to see all commands, or "scan()" to check your surroundings.');
+                this.log('SYSTEM', 'Enjoy your game!');
+                
+                // 恢复原始的handleCommand方法
+                this.handleCommand = originalHandleCommand;
+                
+                // 移除教程的keypress处理器
+                this.commandInput.onkeypress = null;
+                
+                // 添加新的命令处理器
+                this.commandInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        const command = e.target.value;
+                        if (command.trim()) {  // 只处理非空命令
+                            this.handleCommand(command);
+                        }
+                        e.target.value = '';
+                    }
+                });
+                
+                return;
+            }
+
+            const section = tutorial[currentSection];
+            
+            if (currentLine === 0) {
+                this.log('TUTORIAL', `=== ${section.title} ===`);
+            }
+
+            if (currentLine < section.content.length) {
+                this.log('TUTORIAL', section.content[currentLine]);
+                currentLine++;
+            } else {
+                this.log('TUTORIAL', '');
+                currentSection++;
+                currentLine = 0;
+            }
+        };
+
+        // 替换命令处理器
+        this.commandInput.onkeypress = (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault(); // 阻止默认行为
+                this.commandInput.value = ''; // 清空输入框
+                showNextLine();
+            }
+        };
+
+        // 显示第一行
+        this.log('SYSTEM', 'Press ENTER to continue through the tutorial...');
+        showNextLine();
     }
 }
 

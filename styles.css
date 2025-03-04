@@ -208,4 +208,34 @@ body {
 
 #ascii-map:contains('@') {
     animation: blink-position 1s infinite;
+}
+
+/* 添加玩家位置标记的样式 */
+.player-position {
+    color: #ff0; /* 黄色 */
+    display: inline;
+    animation: blink-position 1s infinite;
+}
+
+@keyframes blink-position {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+/* 添加教程文本样式 */
+.tutorial {
+    color: #00ffff;  /* 使用青色来区分教程文本 */
+    font-weight: bold;
+}
+
+/* 修改log方法来支持教程样式 */
+log(type, message) {
+    const div = document.createElement('div');
+    div.textContent = `[${type}] ${message}`;
+    if (type === 'ERROR') div.classList.add('error');
+    if (type === 'WARNING') div.classList.add('warning');
+    if (type === 'TUTORIAL') div.classList.add('tutorial');
+    this.systemLog.appendChild(div);
+    this.systemLog.scrollTop = this.systemLog.scrollHeight;
 } 
