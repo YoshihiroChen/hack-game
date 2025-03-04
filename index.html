@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hacker Simulator</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <canvas id="matrix-bg"></canvas>
+    <div class="game-container">
+        <!-- First Quadrant: Room Map -->
+        <div class="quadrant" id="map">
+            <div class="title">ROOM MAP</div>
+            <div class="map-container">
+                <pre id="ascii-map"></pre>
+            </div>
+        </div>
+
+        <!-- Second Quadrant: Status Monitor -->
+        <div class="quadrant" id="status">
+            <div class="title">STATUS MONITOR</div>
+            <div class="status-bar">
+                <div class="status-label">HEALTH:</div>
+                <div class="progress-bar">
+                    <div class="progress" id="health-bar"></div>
+                </div>
+            </div>
+            <div class="status-bar">
+                <div class="status-label">HUNGER:</div>
+                <div class="progress-bar">
+                    <div class="progress" id="hunger-bar"></div>
+                </div>
+            </div>
+            <div class="status-bar">
+                <div class="status-label">CLEAN:</div>
+                <div class="progress-bar">
+                    <div class="progress" id="clean-bar"></div>
+                </div>
+            </div>
+            <div class="status-bar">
+                <div class="status-label">SANITY:</div>
+                <div class="progress-bar">
+                    <div class="progress" id="sanity-bar"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Third Quadrant: Command Terminal -->
+        <div class="quadrant" id="terminal">
+            <div class="title">TERMINAL</div>
+            <div class="terminal-content" id="terminal-output"></div>
+            <div class="input-line">
+                <span class="prompt">&gt;</span>
+                <input type="text" id="command-input" autocomplete="off">
+            </div>
+        </div>
+
+        <!-- Fourth Quadrant: System Log -->
+        <div class="quadrant" id="output">
+            <div class="title">SYSTEM LOG</div>
+            <div id="system-log"></div>
+        </div>
+    </div>
+    <script src="matrix.js"></script>
+    <script src="script.js"></script>
+</body>
+</html> 
