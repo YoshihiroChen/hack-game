@@ -467,15 +467,13 @@ class Game {
             this.log('ERROR', 'Must be at SHOWER to take a shower');
             return;
         }
-        if (this.state.clean >= 100) {
-            this.log('SYSTEM', 'Already clean');
-            return;
-        }
         this.log('SYSTEM', 'Taking a shower...');
         setTimeout(() => {
             this.state.clean = Math.min(100, this.state.clean + 50);
+            this.advanceTime(15); // 淋浴花费15分钟
+            this.completeTask('SHOWER', 'shower');
             this.updateStatus();
-            this.log('SYSTEM', 'Shower complete. Feeling refreshed!');
+            this.log('SYSTEM', 'Shower complete. Feeling fresh!');
         }, 3000);
     }
 
@@ -556,10 +554,12 @@ class Game {
         }
         this.log('SYSTEM', 'Cooking a meal...');
         setTimeout(() => {
-            this.state.hunger = Math.min(100, this.state.hunger + 50);
+            this.state.hunger = Math.min(100, this.state.hunger + 60);
+            this.advanceTime(30); // 做饭花费30分钟
+            this.completeTask('STOVE', 'cook');
             this.updateStatus();
-            this.log('SYSTEM', 'Meal prepared and eaten. Very satisfying!');
-        }, 5000);
+            this.log('SYSTEM', 'Meal prepared and eaten. Delicious!');
+        }, 4000);
     }
 
     read() {
@@ -620,6 +620,8 @@ class Game {
         this.log('SYSTEM', 'Watering plants...');
         setTimeout(() => {
             this.state.sanity = Math.min(100, this.state.sanity + 5);
+            this.advanceTime(10); // 浇花花费10分钟
+            this.completeTask('PLANTS', 'waterPlants');
             this.updateStatus();
             this.log('SYSTEM', 'Plants watered. The greenery is soothing.');
         }, 2000);
@@ -633,6 +635,8 @@ class Game {
         this.log('SYSTEM', 'Changing clothes...');
         setTimeout(() => {
             this.state.clean = Math.min(100, this.state.clean + 20);
+            this.advanceTime(10); // 换衣服花费10分钟
+            this.completeTask('WARDROBE', 'changeClothes');
             this.updateStatus();
             this.log('SYSTEM', 'Changed into fresh clothes. Feeling neat!');
         }, 2000);
@@ -659,6 +663,8 @@ class Game {
         this.log('SYSTEM', 'Washing clothes...');
         setTimeout(() => {
             this.state.clean = Math.min(100, this.state.clean + 40);
+            this.advanceTime(30); // 洗衣花费30分钟
+            this.completeTask('WASHER', 'washClothes');
             this.updateStatus();
             this.log('SYSTEM', 'Laundry complete! Your clothes are fresh and clean.');
         }, 4000);
@@ -989,6 +995,19 @@ Press any key to continue...`;
         // Implementation of calculateWorkTime method
         // This is a placeholder and should be implemented based on your specific requirements
         return 8; // Placeholder return, actual implementation needed
+    }
+
+    // 添加一个通用的任务完成方法
+    completeTask(location, action) {
+        const task = this.tasks.find(t => 
+            t.location === location && 
+            t.action === action && 
+            !t.completed
+        );
+        if (task) {
+            task.completed = true;
+            this.updateTasksDisplay();
+        }
     }
 }
 
