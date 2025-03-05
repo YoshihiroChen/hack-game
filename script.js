@@ -5,7 +5,7 @@ class Game {
             hunger: 100,
             clean: 100,
             sanity: 100,
-            position: "DESK" // 初始位置在书房的桌子前
+            position: "DESK" // 第一天从DESK开始
         };
 
         // 修改地图部分
@@ -64,6 +64,9 @@ class Game {
         // 启动时间系统
         this.startTimeSystem();
 
+        // 添加新的状态标记
+        this.needCheckBody = false;  // 是否需要检查本体
+
         this.initialize();
     }
 
@@ -85,7 +88,6 @@ class Game {
         this.startGameLoop();
         
         // 显示欢迎信息
-        this.log('SYSTEM', '=== Welcome to Programmer\'s Life Simulator ===');
         this.log('SYSTEM', 'Type "help" for available commands');
         this.log('SYSTEM', 'Type "tutorial" to view the tutorial');
         this.log('SYSTEM', 'Current location: ' + this.state.position);
@@ -172,6 +174,9 @@ class Game {
                 break;
             case 'washclothes':
                 this.washClothes();
+                break;
+            case 'checkbody':
+                this.checkBody();
                 break;
             default:
                 this.log('ERROR', `Unknown command: ${cmd}`);
@@ -296,10 +301,28 @@ class Game {
     }
 
     updateStatus() {
-        document.getElementById('health-bar').style.width = `${this.state.health}%`;
-        document.getElementById('hunger-bar').style.width = `${this.state.hunger}%`;
-        document.getElementById('clean-bar').style.width = `${this.state.clean}%`;
-        document.getElementById('sanity-bar').style.width = `${this.state.sanity}%`;
+        const updateStatusBar = (id, value) => {
+            const bar = document.getElementById(id);
+            bar.style.width = `${value}%`;
+            
+            // 移除所有现有的类
+            bar.classList.remove('progress-normal', 'progress-warning', 'progress-critical');
+            
+            // 根据值添加对应的类
+            if (value <= 20) {
+                bar.classList.add('progress-critical');
+            } else if (value <= 40) {
+                bar.classList.add('progress-warning');
+            } else {
+                bar.classList.add('progress-normal');
+            }
+        };
+
+        // 更新每个状态条
+        updateStatusBar('health-bar', this.state.health);
+        updateStatusBar('hunger-bar', this.state.hunger);
+        updateStatusBar('clean-bar', this.state.clean);
+        updateStatusBar('sanity-bar', this.state.sanity);
     }
 
     startGameLoop() {
@@ -339,7 +362,8 @@ class Game {
             'status() - Show current status',
             'scan() - Scan surroundings',
             '',
-            'You can also move directly to specific items. When at an item, you can interact with it.'
+            'You can also move directly to specific items. When at an item, you can interact with it.',
+            'checkbody() - Check your physical body at desk (required before sleep from Day 5)'
         ];
         commands.forEach(cmd => this.appendToTerminal(cmd));
     }
@@ -352,13 +376,13 @@ class Game {
             return;
         }
 
-        // 定义房间和其包含的物品
+        // 修改房间定义中的命令提示
         const rooms = {
             'BEDROOM': {
                 description: 'You are in the bedroom. You can move to:',
                 items: {
                     'BED': 'sleep() to restore mental health',
-                    'WARDROBE': 'changeClothes() to improve cleanliness'
+                    'WARDROBE': 'changeclothes() to improve cleanliness'
                 }
             },
             'STUDY': {
@@ -384,15 +408,15 @@ class Game {
             'LIVING': {
                 description: 'You are in the living room. You can move to:',
                 items: {
-                    'SOFA': 'watchTV() to relax and watch TV',
+                    'SOFA': 'watchtv() to relax and watch TV',
                     'TV': 'move.to(SOFA) to watch TV'
                 }
             },
             'BALCONY': {
                 description: 'You are on the balcony. You can move to:',
                 items: {
-                    'WASHER': 'washClothes() to clean your clothes',
-                    'PLANTS': 'waterPlants() to improve mood',
+                    'WASHER': 'washclothes() to clean your clothes',
+                    'PLANTS': 'waterplants() to improve mood',
                     'CHAIR': 'relax() to enjoy fresh air'
                 }
             }
@@ -452,14 +476,19 @@ class Game {
             return;
         }
 
-        // 检查是否所有任务都完成
+        // 检查是否有未完成的任务
         const uncompletedTasks = this.tasks.filter(task => !task.completed);
         if (uncompletedTasks.length > 0) {
             this.log('ERROR', 'Cannot sleep yet. You still have uncompleted tasks!');
             return;
         }
 
-        // 显示日结算模态框
+        // 第五天开始，检查是否确认过本体
+        if (this.gameTime.day >= 5 && this.needCheckBody) {
+            this.log('ERROR', 'Cannot sleep. You need to check your physical body at the desk first.');
+            return;
+        }
+
         this.showDayEndModal();
     }
 
@@ -602,13 +631,18 @@ class Game {
         }, 5000);
     }
 
-    // 添加检查所有任务是否完成的方法
+    // 修改checkAllTasksCompleted方法
     checkAllTasksCompleted() {
         const uncompletedTasks = this.tasks.filter(task => !task.completed);
         if (uncompletedTasks.length === 0) {
             // 检查是否是第四天并触发恐怖事件
             if (this.gameTime.day === 4) {
                 this.triggerHorrorEvent();
+            } else if (this.gameTime.day >= 5) {
+                // 第五天开始，完成任务后提示需要检查本体
+                this.needCheckBody = true;  // 设置标记
+                this.log('WARNING', 'I feel like someone is watching me...');
+                this.log('SYSTEM', 'I should use checkbody() to check my physical body at the desk before going to sleep.');
             } else {
                 this.log('SYSTEM', '=== All tasks completed! ===');
                 this.log('SYSTEM', 'You can now move.to(bed) and sleep() to end the day.');
@@ -1005,11 +1039,10 @@ class Game {
 
     typeWriter(element, text, i, speed) {
         if (i < text.length) {
-            element.innerHTML += text.charAt(i);
+            element.innerHTML = text.substring(0, i + 1);
             i++;
             setTimeout(() => this.typeWriter(element, text, i, speed), speed);
         } else {
-            // 文本显示完成后，等待几秒然后开始新的一天
             setTimeout(() => {
                 this.startNewDay();
             }, 3000);
@@ -1022,7 +1055,7 @@ class Game {
         const completedHousework = this.tasks.filter(t => t.completed && t.type === 'housework').length;
         const totalHousework = this.tasks.filter(t => t.type === 'housework').length;
 
-        return `Day ${this.gameTime.day} Summary:
+        let summary = `Day ${this.gameTime.day} Summary:
         
 Tasks Completed:
 - Work Tasks: ${completedWork}/${totalWork}
@@ -1033,23 +1066,57 @@ Current Status:
 - Health: ${this.state.health}%
 - Hunger: ${this.state.hunger}%
 - Clean: ${this.state.clean}%
-- Sanity: ${this.state.sanity}%
+- Sanity: ${this.state.sanity}%\n`;
 
-Press any key to continue...`;
+        // 添加恐怖事件日志（使用黄色字体）
+        if (this.gameTime.day === 4) {
+            summary += `\n<span style="color: #ffff00">Anomalies Detected:
+- System malfunction occurred
+- Soul control interface was temporarily compromised
+- Unauthorized movement to kitchen was detected
+- Unknown entity presence was registered in the system</span>\n`;
+        } else if (this.gameTime.day === 6) {
+            summary += `\n<span style="color: #ffff00">Anomalies Detected:
+- Soul initialization error occurred
+- Unexpected starting position: KITCHEN
+- System reported location mismatch
+- Investigation of the anomaly is ongoing</span>\n`;
+        }
+
+        summary += '\nPress any key to continue...';
+        return summary;
     }
 
     startNewDay() {
         this.gameTime.day++;
         this.gameTime.hour = 9;
         this.gameTime.minute = 0;
+        
+        // 根据天数设置起始位置
+        if (this.gameTime.day === 6) {
+            // 第六天的恐怖事件
+            this.state.position = 'KITCHEN';  // 灵魂在厨房醒来
+            this.log('WARNING', 'ERROR: Wrong location');
+            this.log('WARNING', 'Soul initialization failed - unexpected starting position');
+        } else if (this.gameTime.day === 1) {
+            this.state.position = 'DESK';  // 第一天在书桌前醒来
+        } else {
+            this.state.position = 'BED';   // 其他天数在床上醒来
+        }
+        
         this.generateDailyTasks();
         this.updateTimeDisplay();
+        this.updateMap();
         
         // 移除模态框
         const modal = document.querySelector('.modal-overlay');
         if (modal) {
             modal.remove();
         }
+
+        // 添加新一天的提示信息
+        this.log('SYSTEM', `=== Day ${this.gameTime.day} Started ===`);
+        this.log('SYSTEM', 'New tasks have been assigned. Complete them before going to sleep.');
     }
 
     calculateWorkTime() {
@@ -1089,6 +1156,26 @@ Press any key to continue...`;
                 this.checkAllTasksCompleted();
             }, 1000); // 等待1秒后显示完成提示
         }
+    }
+
+    // 添加检查本体的方法
+    checkBody() {
+        if (this.state.position !== 'DESK') {
+            this.log('ERROR', 'Must be at DESK to check your physical body');
+            return;
+        }
+
+        if (!this.needCheckBody) {
+            this.log('SYSTEM', 'No need to check your physical body right now.');
+            return;
+        }
+
+        this.log('SYSTEM', 'Checking physical body...');
+        setTimeout(() => {
+            this.log('SYSTEM', 'Physical body status confirmed. Everything seems normal... for now.');
+            this.needCheckBody = false;  // 重置标记
+            this.log('SYSTEM', 'You can now move.to(bed) and sleep() to end the day.');
+        }, 3000);
     }
 }
 

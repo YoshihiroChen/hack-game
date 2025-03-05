@@ -112,8 +112,19 @@ body {
 
 .progress {
     height: 100%;
-    background-color: #00ff00;
-    transition: width 0.3s ease;
+    transition: width 0.3s ease, background-color 0.3s ease;
+}
+
+.progress-normal {
+    background-color: #00ff00;  /* 正常状态为绿色 */
+}
+
+.progress-warning {
+    background-color: #ffff00;  /* 警告状态为黄色 */
+}
+
+.progress-critical {
+    background-color: #ff0000;  /* 危险状态为红色 */
 }
 
 /* 终端样式 */
