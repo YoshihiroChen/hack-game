@@ -19,29 +19,40 @@
 
         <!-- Second Quadrant: Status Monitor -->
         <div class="quadrant" id="status">
-            <div class="title">STATUS MONITOR</div>
-            <div class="status-bar">
-                <div class="status-label">HEALTH:</div>
-                <div class="progress-bar">
-                    <div class="progress" id="health-bar"></div>
+            <div class="title">
+                Status Monitor
+                <span id="game-time" class="time-display">Day 1 - 09:00</span>
+            </div>
+            <div class="status-container">
+                <div class="status-bar">
+                    <div class="status-label">HEALTH:</div>
+                    <div class="progress-bar">
+                        <div class="progress" id="health-bar"></div>
+                    </div>
+                </div>
+                <div class="status-bar">
+                    <div class="status-label">HUNGER:</div>
+                    <div class="progress-bar">
+                        <div class="progress" id="hunger-bar"></div>
+                    </div>
+                </div>
+                <div class="status-bar">
+                    <div class="status-label">CLEAN:</div>
+                    <div class="progress-bar">
+                        <div class="progress" id="clean-bar"></div>
+                    </div>
+                </div>
+                <div class="status-bar">
+                    <div class="status-label">SANITY:</div>
+                    <div class="progress-bar">
+                        <div class="progress" id="sanity-bar"></div>
+                    </div>
                 </div>
             </div>
-            <div class="status-bar">
-                <div class="status-label">HUNGER:</div>
-                <div class="progress-bar">
-                    <div class="progress" id="hunger-bar"></div>
-                </div>
-            </div>
-            <div class="status-bar">
-                <div class="status-label">CLEAN:</div>
-                <div class="progress-bar">
-                    <div class="progress" id="clean-bar"></div>
-                </div>
-            </div>
-            <div class="status-bar">
-                <div class="status-label">SANITY:</div>
-                <div class="progress-bar">
-                    <div class="progress" id="sanity-bar"></div>
+            <div id="tasks-container">
+                <div class="tasks-title">Today's Tasks:</div>
+                <div id="tasks-list">
+                    <!-- 任务会动态添加到这里 -->
                 </div>
             </div>
         </div>

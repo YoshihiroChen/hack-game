@@ -84,23 +84,28 @@ body {
 }
 
 /* 状态监控样式 */
-#status {
-    padding-top: 30px;
+.status-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 30px;
+    padding: 0 10px;
 }
 
 .status-bar {
-    margin: 10px 0;
+    margin: 5px 0;
     display: flex;
     align-items: center;
 }
 
 .status-label {
-    width: 80px;
+    width: 60px;
+    font-size: 12px;
 }
 
 .progress-bar {
     flex-grow: 1;
-    height: 20px;
+    height: 15px;
     border: 1px solid #00ff00;
     background-color: #001100;
 }
@@ -238,4 +243,99 @@ log(type, message) {
     if (type === 'TUTORIAL') div.classList.add('tutorial');
     this.systemLog.appendChild(div);
     this.systemLog.scrollTop = this.systemLog.scrollHeight;
+}
+
+/* 添加实体位置标记的样式 */
+.physical-body {
+    color: #ff0; /* 黄色 */
+    display: inline;
+    animation: blink-position 1s infinite;
+}
+
+/* 时间显示样式 */
+.time-display {
+    float: right;
+    color: #0f0;
+    font-family: 'Courier New', monospace;
+}
+
+/* 任务列表样式 */
+#tasks-container {
+    margin-top: 10px;
+    border-top: 1px solid #0f0;
+    padding-top: 5px;
+}
+
+.tasks-title {
+    color: #0f0;
+    margin-bottom: 5px;
+    font-size: 12px;
+}
+
+.task-category {
+    color: #0f0;
+    margin: 5px 0;
+    font-size: 11px;
+    font-weight: bold;
+}
+
+.task-item {
+    display: flex;
+    justify-content: space-between;
+    margin: 2px 0;
+    padding: 2px;
+    border: 1px solid #0f0;
+    background: rgba(0, 255, 0, 0.1);
+    font-size: 11px;
+}
+
+.task-complete {
+    text-decoration: line-through;
+    opacity: 0.7;
+}
+
+/* 模态框样式 */
+.modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(5px);
+    z-index: 1000;
+}
+
+.modal-content {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #000;
+    border: 2px solid #0f0;
+    padding: 20px;
+    width: 80%;
+    max-width: 600px;
+    font-family: 'Courier New', monospace;
+    color: #0f0;
+    box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
+}
+
+.modal-header {
+    border-bottom: 1px solid #0f0;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+}
+
+.modal-text {
+    min-height: 200px;
+    white-space: pre-wrap;
+}
+
+.typing-effect {
+    overflow: hidden;
+    border-right: 2px solid #0f0;
+    white-space: nowrap;
+    animation: typing 3.5s steps(40, end), blink-caret .75s step-end infinite;
 } 

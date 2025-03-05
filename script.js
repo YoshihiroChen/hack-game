@@ -12,13 +12,13 @@ class Game {
         this.map = [
             "+-------------+-----------+----+",
             "|  BEDROOM    | STUDY    |BATH|",
-            "| [___]    [] |[===] [#] |[=] |",
+            "| [___]    [] |[=&=] [#] |[=] |",
             "| BED      W  |DESK   B  | S  |",
             "+------+------+-----------+----+",
             "|      |     LIVING          |",
             "|      | [===]     [##]      |",
             "|BALC  |  SOFA      TV       |",
-            "| {~}  |                     |",
+            "| [W]  |                     |",
             "| P C  |            +--------+",
             "+------+------------+KITCHEN |",
             "                    |[##] F  |",
@@ -28,12 +28,13 @@ class Game {
         // 更新位置系统
         this.locations = {
             // Rooms
-            "BEDROOM": { x: 6, y: 2 },
-            "STUDY": { x: 17, y: 2 },
-            "BATHROOM": { x: 25, y: 2 },
-            "KITCHEN": { x: 24, y: 11 },
-            "LIVING": { x: 18, y: 7 },
-            "BALCONY": { x: 4, y: 9 },
+            "BEDROOM": { x: 7, y: 2 },     // 在bed和wardrobe的[]之间
+            "STUDY": { x: 19, y: 2 },      // 在[=&=]和[#]之间
+            "BATHROOM": { x: 27, y: 2 },    // 保持不变
+            "KITCHEN": { x: 25, y: 11 },    // 在[##]和F之间
+            "LIVING": { x: 18, y: 7 },      // 保持不变
+            "BALCONY": { x: 6, y: 8 },      // 在P和C之间
+            "WASHER": { x: 2, y: 8 },      // 在P C上方
             
             // Items in rooms
             "BED": { x: 2, y: 2 },
@@ -43,11 +44,25 @@ class Game {
             "SHOWER": { x: 26, y: 2 },
             "FRIDGE": { x: 26, y: 11 },
             "STOVE": { x: 23, y: 11 },
-            "SOFA": { x: 15, y: 6 },
+            "SOFA": { x: 17, y: 6 },       // 修改坐标让@显示在[===]中间
             "TV": { x: 21, y: 6 },
             "PLANTS": { x: 2, y: 8 },
             "CHAIR": { x: 4, y: 8 }
         };
+
+        // 添加时间系统
+        this.gameTime = {
+            day: 1,
+            hour: 9,
+            minute: 0
+        };
+        
+        // 添加任务系统
+        this.tasks = [];
+        this.generateDailyTasks();
+        
+        // 启动时间系统
+        this.startTimeSystem();
 
         this.initialize();
     }
@@ -62,36 +77,30 @@ class Game {
         // 添加调试信息
         if (!this.asciiMap) {
             console.error('ASCII map element not found!');
-        } else {
-            console.log('ASCII map element found');
         }
-
-        // 立即显示初始地图
-        this.updateMap();
-        console.log('Initial map update called');
 
         // 初始化游戏
         this.updateMap();
         this.updateStatus();
         this.startGameLoop();
-        this.log('SYSTEM', 'Game initialization complete');
-        this.log('SYSTEM', 'Type "help" for available commands');
-        this.log('SYSTEM', 'Current location: ' + this.state.position);
-        this.log('SYSTEM', 'Map Legend: @ marks your current position');
-
+        
         // 显示欢迎信息
         this.log('SYSTEM', '=== Welcome to Programmer\'s Life Simulator ===');
-        this.log('SYSTEM', 'Press ENTER to start the tutorial...');
-        
-        // 等待用户按Enter开始教程
-        const startTutorial = (e) => {
+        this.log('SYSTEM', 'Type "help" for available commands');
+        this.log('SYSTEM', 'Type "tutorial" to view the tutorial');
+        this.log('SYSTEM', 'Current location: ' + this.state.position);
+        this.log('SYSTEM', 'Map Legend: @ - Your spirit, & - Your physical body');
+
+        // 添加命令处理监听器
+        this.commandInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
-                this.commandInput.removeEventListener('keypress', startTutorial);
-                this.showTutorial();
+                const command = e.target.value;
+                if (command.trim()) {
+                    this.handleCommand(command);
+                }
+                e.target.value = '';
             }
-        };
-        
-        this.commandInput.addEventListener('keypress', startTutorial);
+        });
     }
 
     handleCommand(command) {
@@ -123,6 +132,9 @@ class Game {
                 break;
             case 'scan':
                 this.scanSurroundings();
+                break;
+            case 'tutorial':
+                this.showTutorial();
                 break;
             // 添加所有交互命令
             case 'sleep':
@@ -158,6 +170,9 @@ class Game {
             case 'washhands':
                 this.washHands();
                 break;
+            case 'washclothes':
+                this.washClothes();
+                break;
             default:
                 this.log('ERROR', `Unknown command: ${cmd}`);
         }
@@ -188,40 +203,95 @@ class Game {
         // 创建地图副本
         let currentMap = [...this.map];
         
-        // 在当前位置添加带颜色的标记 (@)
-        const pos = this.locations[this.state.position];
-        if (pos) {
-            // 清空原有内容
-            this.asciiMap.innerHTML = '';
-            
-            // 分三部分添加：标记位置之前的内容、标记、标记位置之后的内容
-            for (let i = 0; i < currentMap.length; i++) {
-                if (i === pos.y) {
+        // 清空原有内容
+        this.asciiMap.innerHTML = '';
+        
+        // 分行添加内容
+        for (let i = 0; i < currentMap.length; i++) {
+            if (i === 2) { // DESK所在的行
+                const line = currentMap[i];
+                const deskStart = line.indexOf('[=') + 2;  // 找到[=的位置并加2
+                const playerPos = this.locations[this.state.position];
+                
+                // 分三段：desk之前、desk标记、desk之后
+                const beforeDesk = line.substring(0, deskStart);
+                const afterDesk = line.substring(deskStart + 1);
+                
+                // 添加desk之前的内容
+                if (playerPos && playerPos.y === 2 && playerPos.x < deskStart) {
+                    const beforePlayer = beforeDesk.substring(0, playerPos.x);
+                    const afterPlayer = beforeDesk.substring(playerPos.x + 1);
+                    
+                    this.asciiMap.appendChild(this.createTextSpan(beforePlayer));
+                    this.asciiMap.appendChild(this.createPlayerSpan('@'));
+                    this.asciiMap.appendChild(this.createTextSpan(afterPlayer));
+                } else {
+                    this.asciiMap.appendChild(this.createTextSpan(beforeDesk));
+                }
+                
+                // 添加desk标记（&）
+                this.asciiMap.appendChild(this.createBodySpan('&'));
+                
+                // 添加desk之后的内容
+                if (playerPos && playerPos.y === 2 && playerPos.x > deskStart) {
+                    const beforePlayer = afterDesk.substring(0, playerPos.x - deskStart - 1);
+                    const afterPlayer = afterDesk.substring(playerPos.x - deskStart);
+                    
+                    this.asciiMap.appendChild(this.createTextSpan(beforePlayer));
+                    this.asciiMap.appendChild(this.createPlayerSpan('@'));
+                    this.asciiMap.appendChild(this.createTextSpan(afterPlayer + '\n'));
+                } else {
+                    this.asciiMap.appendChild(this.createTextSpan(afterDesk + '\n'));
+                }
+            } else if (i === 6 && this.state.position === 'SOFA') { // SOFA所在的行
+                const line = currentMap[i];
+                const sofaStart = line.indexOf('[===]');  // 找到[===]的起始位置
+                
+                const beforeSofa = line.substring(0, sofaStart);
+                const afterSofa = line.substring(sofaStart + 5);  // 跳过整个[===]
+                
+                this.asciiMap.appendChild(this.createTextSpan(beforeSofa));
+                this.asciiMap.appendChild(this.createTextSpan('[='));
+                this.asciiMap.appendChild(this.createPlayerSpan('@'));
+                this.asciiMap.appendChild(this.createTextSpan('=]'));
+                this.asciiMap.appendChild(this.createTextSpan(afterSofa + '\n'));
+            } else {
+                // 处理其他行
+                if (this.locations[this.state.position]?.y === i && this.state.position !== 'SOFA') {
+                    const pos = this.locations[this.state.position];
                     const line = currentMap[i];
                     const before = line.substring(0, pos.x);
                     const after = line.substring(pos.x + 1);
                     
-                    const span = document.createElement('span');
-                    span.textContent = before;
-                    this.asciiMap.appendChild(span);
-                    
-                    const playerSpan = document.createElement('span');
-                    playerSpan.textContent = '@';
-                    playerSpan.className = 'player-position';
-                    this.asciiMap.appendChild(playerSpan);
-                    
-                    const endSpan = document.createElement('span');
-                    endSpan.textContent = after + '\n';
-                    this.asciiMap.appendChild(endSpan);
+                    this.asciiMap.appendChild(this.createTextSpan(before));
+                    this.asciiMap.appendChild(this.createPlayerSpan('@'));
+                    this.asciiMap.appendChild(this.createTextSpan(after + '\n'));
                 } else {
-                    const span = document.createElement('span');
-                    span.textContent = currentMap[i] + '\n';
-                    this.asciiMap.appendChild(span);
+                    this.asciiMap.appendChild(this.createTextSpan(currentMap[i] + '\n'));
                 }
             }
-        } else {
-            this.asciiMap.textContent = currentMap.join('\n');
         }
+    }
+
+    // 添加辅助方法来创建带样式的span元素
+    createTextSpan(text) {
+        const span = document.createElement('span');
+        span.textContent = text;
+        return span;
+    }
+
+    createPlayerSpan(text) {
+        const span = document.createElement('span');
+        span.textContent = text;
+        span.className = 'player-position';
+        return span;
+    }
+
+    createBodySpan(text) {
+        const span = document.createElement('span');
+        span.textContent = text;
+        span.className = 'physical-body';
+        return span;
     }
 
     updateStatus() {
@@ -257,16 +327,18 @@ class Game {
     showHelp() {
         const commands = [
             'help - Show command list',
+            'tutorial - Start the interactive tutorial',
             'move.to(location) - Move to a location:',
             '  Bedroom: bed, wardrobe',
             '  Study: desk, bookshelf',
             '  Bathroom: shower, sink',
             '  Kitchen: fridge, stove',
-            '  Living Room: sofa, tv',
-            '  Balcony: plants, chair',
-            'interact() - Interact with current location',
+            '  Living: sofa, tv',
+            '  Balcony: washer, plants, chair',
             'status() - Show current status',
-            'scan() - Scan surroundings'
+            'scan() - Scan surroundings',
+            '',
+            'You can also move directly to specific items. When at an item, you can interact with it.'
         ];
         commands.forEach(cmd => this.appendToTerminal(cmd));
     }
@@ -311,13 +383,14 @@ class Game {
             'LIVING': {
                 description: 'You are in the living room. You can move to:',
                 items: {
-                    'SOFA': 'watchTV() to relax',
-                    'TV': 'watchTV() to relax'
+                    'SOFA': 'watchTV() to relax and watch TV',
+                    'TV': 'move.to(SOFA) to watch TV'
                 }
             },
             'BALCONY': {
                 description: 'You are on the balcony. You can move to:',
                 items: {
+                    'WASHER': 'washClothes() to clean your clothes',
                     'PLANTS': 'waterPlants() to improve mood',
                     'CHAIR': 'relax() to enjoy fresh air'
                 }
@@ -377,12 +450,16 @@ class Game {
             this.log('ERROR', 'Must be at BED to sleep');
             return;
         }
-        this.log('SYSTEM', 'Resting...');
-        setTimeout(() => {
-            this.state.sanity = Math.min(100, this.state.sanity + 50);
-            this.updateStatus();
-            this.log('SYSTEM', 'Rest complete');
-        }, 3000);
+
+        // 检查是否所有任务都完成
+        const uncompletedTasks = this.tasks.filter(task => !task.completed);
+        if (uncompletedTasks.length > 0) {
+            this.log('ERROR', 'Cannot sleep yet. You still have uncompleted tasks!');
+            return;
+        }
+
+        // 显示日结算模态框
+        this.showDayEndModal();
     }
 
     shower() {
@@ -415,8 +492,8 @@ class Game {
 
     scanSurroundings() {
         const surroundings = {
-            'DESK': 'A computer desk with multiple monitors in a cozy corner of the study.',
-            'BED': 'A comfortable bed in the spacious bedroom.',
+            'DESK': 'A computer desk with multiple monitors. Your physical body sits here, typing commands endlessly into the terminal while your spirit roams freely.',
+            'BED': 'A comfortable bed in the spacious bedroom, rarely used as your body remains at the desk.',
             'SHOWER': 'A modern shower in the bright bathroom.',
             'SINK': 'A clean sink with a large mirror.',
             'FRIDGE': 'A well-stocked fridge in the open-plan kitchen.',
@@ -426,7 +503,8 @@ class Game {
             'TV': 'A large flat-screen TV mounted on the wall.',
             'PLANTS': 'Some potted plants on the peaceful balcony.',
             'CHAIR': 'A comfortable outdoor chair perfect for relaxation.',
-            'WARDROBE': 'A spacious wardrobe with your clothes neatly organized.'
+            'WARDROBE': 'A spacious wardrobe with your clothes neatly organized.',
+            'WASHER': 'A modern washing machine in the living room.'
         };
         this.log('SYSTEM', `Scanning current location: ${this.state.position}`);
         this.log('SYSTEM', surroundings[this.state.position] || 'Nothing special here');
@@ -446,7 +524,8 @@ class Game {
             "TV": () => this.watchTV(),
             "PLANTS": () => this.waterPlants(),
             "WARDROBE": () => this.changeClothes(),
-            "CHAIR": () => this.relax()
+            "CHAIR": () => this.relax(),
+            "WASHER": () => this.washClothes()
         };
 
         if (interactions[item]) {
@@ -501,20 +580,31 @@ class Game {
             this.log('ERROR', 'Must be at DESK to work');
             return;
         }
-        this.log('SYSTEM', 'Working on code...');
+
+        // 找到第一个未完成的工作任务
+        const nextTask = this.tasks.find(task => !task.completed && task.type === 'work');
+        if (!nextTask) {
+            this.log('SYSTEM', 'No more work tasks to complete!');
+            return;
+        }
+
+        this.log('SYSTEM', `Working on: ${nextTask.description}...`);
         setTimeout(() => {
+            nextTask.completed = true;
             this.state.sanity = Math.max(0, this.state.sanity - 10);
+            this.advanceTime(30); // 工作花费30分钟
             this.updateStatus();
-            this.log('SYSTEM', 'Work session complete. Feeling tired...');
+            this.updateTasksDisplay();
+            this.log('SYSTEM', `Completed task: ${nextTask.description}`);
         }, 5000);
     }
 
     watchTV() {
-        if (this.state.position !== 'SOFA' && this.state.position !== 'TV') {
-            this.log('ERROR', 'Must be at SOFA or TV to watch television');
+        if (this.state.position !== 'SOFA') {  // 只检查是否在沙发位置
+            this.log('ERROR', 'Must be at SOFA to watch television');
             return;
         }
-        this.log('SYSTEM', 'Watching TV...');
+        this.log('SYSTEM', 'Watching TV while relaxing on the sofa...');
         setTimeout(() => {
             this.state.sanity = Math.min(100, this.state.sanity + 15);
             this.updateStatus();
@@ -561,6 +651,19 @@ class Game {
         }, 3000);
     }
 
+    washClothes() {
+        if (this.state.position !== 'WASHER') {
+            this.log('ERROR', 'Must be at WASHER to wash clothes');
+            return;
+        }
+        this.log('SYSTEM', 'Washing clothes...');
+        setTimeout(() => {
+            this.state.clean = Math.min(100, this.state.clean + 40);
+            this.updateStatus();
+            this.log('SYSTEM', 'Laundry complete! Your clothes are fresh and clean.');
+        }, 4000);
+    }
+
     // 添加新的教程方法
     showTutorial() {
         const tutorial = [
@@ -585,7 +688,8 @@ class Game {
                     '- Bathroom: Has a shower(SHOWER)',
                     '- Kitchen: Has a fridge(FRIDGE) and stove(STOVE)',
                     '- Living Room: Has a sofa(SOFA) and TV(TV)',
-                    '- Balcony: Has plants(PLANTS) and chair(CHAIR)'
+                    '- Balcony: Has plants(PLANTS) and chair(CHAIR)',
+                    '- Washer: Has a washing machine(WASHER)'
                 ]
             },
             {
@@ -597,6 +701,7 @@ class Game {
                     '- At fridge: eat() - Restore hunger',
                     '- At desk: work() - Code and work',
                     '- At sofa: watchTV() - Relax',
+                    '- At washer: washClothes() - Clean your clothes',
                     '- At balcony: relax() - Enjoy fresh air'
                 ]
             },
@@ -619,7 +724,11 @@ class Game {
                     '',
                     'To take a shower:',
                     '1. Type move.to(shower) to move to the shower',
-                    '2. Type shower() to start showering'
+                    '2. Type shower() to start showering',
+                    '',
+                    'To wash clothes:',
+                    '1. Type move.to(washer) to move to the washer',
+                    '2. Type washClothes() to start washing'
                 ]
             }
         ];
@@ -690,6 +799,196 @@ class Game {
         // 显示第一行
         this.log('SYSTEM', 'Press ENTER to continue through the tutorial...');
         showNextLine();
+    }
+
+    // 时间系统
+    startTimeSystem() {
+        setInterval(() => {
+            this.gameTime.minute += 10;
+            if (this.gameTime.minute >= 60) {
+                this.gameTime.minute = 0;
+                this.gameTime.hour++;
+            }
+            this.updateTimeDisplay();
+        }, 60000); // 每分钟更新一次
+    }
+
+    updateTimeDisplay() {
+        const timeDisplay = document.getElementById('game-time');
+        timeDisplay.textContent = `Day ${this.gameTime.day} - ${String(this.gameTime.hour).padStart(2, '0')}:${String(this.gameTime.minute).padStart(2, '0')}`;
+    }
+
+    // 任务系统
+    generateDailyTasks() {
+        // 工作任务池
+        const workTasks = [
+            "Fix website bug",
+            "Review pull requests",
+            "Write documentation",
+            "Attend team meeting",
+            "Debug production issue",
+            "Implement new feature",
+            "Optimize database queries",
+            "Update dependencies"
+        ];
+
+        // 家务任务池
+        const houseworkTasks = [
+            { description: "Take a shower", location: "SHOWER", action: "shower" },
+            { description: "Do laundry", location: "WASHER", action: "washClothes" },
+            { description: "Change clothes", location: "WARDROBE", action: "changeClothes" },
+            { description: "Water the plants", location: "PLANTS", action: "waterPlants" },
+            { description: "Cook a meal", location: "STOVE", action: "cook" }
+        ];
+
+        // 随机选择2-3个工作任务
+        const selectedWorkTasks = this.shuffleArray(workTasks)
+            .slice(0, 2 + Math.floor(Math.random() * 2))
+            .map((desc, id) => ({
+                id: id + 1,
+                description: desc,
+                location: "DESK",
+                action: "work",
+                type: "work",
+                completed: false
+            }));
+
+        // 随机选择2-3个家务任务
+        const selectedHouseworkTasks = this.shuffleArray(houseworkTasks)
+            .slice(0, 2 + Math.floor(Math.random() * 2))
+            .map((task, id) => ({
+                id: id + selectedWorkTasks.length + 1,
+                description: task.description,
+                location: task.location,
+                action: task.action,
+                type: "housework",
+                completed: false
+            }));
+
+        this.tasks = [...selectedWorkTasks, ...selectedHouseworkTasks];
+        this.updateTasksDisplay();
+    }
+
+    updateTasksDisplay() {
+        const tasksList = document.getElementById('tasks-list');
+        tasksList.innerHTML = '';
+        
+        // 分类显示任务
+        const workTasks = this.tasks.filter(t => t.type === 'work');
+        const houseworkTasks = this.tasks.filter(t => t.type === 'housework');
+
+        // 添加工作任务标题
+        const workTitle = document.createElement('div');
+        workTitle.className = 'task-category';
+        workTitle.textContent = 'Work Tasks:';
+        tasksList.appendChild(workTitle);
+
+        // 显示工作任务
+        workTasks.forEach(this.createTaskElement.bind(this));
+
+        // 添加家务任务标题
+        const houseworkTitle = document.createElement('div');
+        houseworkTitle.className = 'task-category';
+        houseworkTitle.textContent = 'Housework Tasks:';
+        tasksList.appendChild(houseworkTitle);
+
+        // 显示家务任务
+        houseworkTasks.forEach(this.createTaskElement.bind(this));
+    }
+
+    createTaskElement(task) {
+        const taskElement = document.createElement('div');
+        taskElement.className = `task-item ${task.completed ? 'task-complete' : ''}`;
+        taskElement.innerHTML = `
+            <span>${task.description}</span>
+            <span>${task.completed ? '✓' : '⋯'}</span>
+        `;
+        document.getElementById('tasks-list').appendChild(taskElement);
+    }
+
+    // 添加数组随机排序方法
+    shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+    }
+
+    // 修改时间系统，添加快进功能
+    advanceTime(minutes) {
+        this.gameTime.minute += minutes;
+        while (this.gameTime.minute >= 60) {
+            this.gameTime.minute -= 60;
+            this.gameTime.hour++;
+        }
+        this.updateTimeDisplay();
+    }
+
+    // 添加模态框相关方法
+    showDayEndModal() {
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-header">Day ${this.gameTime.day} Complete</div>
+                <div class="modal-text"></div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        modal.style.display = 'block';
+
+        // 添加打字机效果的文本
+        const textElement = modal.querySelector('.modal-text');
+        const summary = this.generateDaySummary();
+        this.typeWriter(textElement, summary, 0, 50);
+    }
+
+    typeWriter(element, text, i, speed) {
+        if (i < text.length) {
+            element.innerHTML += text.charAt(i);
+            i++;
+            setTimeout(() => this.typeWriter(element, text, i, speed), speed);
+        } else {
+            // 文本显示完成后，等待几秒然后开始新的一天
+            setTimeout(() => {
+                this.startNewDay();
+            }, 3000);
+        }
+    }
+
+    generateDaySummary() {
+        return `Day ${this.gameTime.day} Summary:
+        
+Tasks Completed: ${this.tasks.filter(t => t.completed).length}/${this.tasks.length}
+Time Spent Working: ${this.calculateWorkTime()} hours
+Current Status:
+- Health: ${this.state.health}%
+- Hunger: ${this.state.hunger}%
+- Clean: ${this.state.clean}%
+- Sanity: ${this.state.sanity}%
+
+Press any key to continue...`;
+    }
+
+    startNewDay() {
+        this.gameTime.day++;
+        this.gameTime.hour = 9;
+        this.gameTime.minute = 0;
+        this.generateDailyTasks();
+        this.updateTimeDisplay();
+        
+        // 移除模态框
+        const modal = document.querySelector('.modal-overlay');
+        if (modal) {
+            modal.remove();
+        }
+    }
+
+    calculateWorkTime() {
+        // Implementation of calculateWorkTime method
+        // This is a placeholder and should be implemented based on your specific requirements
+        return 8; // Placeholder return, actual implementation needed
     }
 }
 
