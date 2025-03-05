@@ -606,9 +606,47 @@ class Game {
     checkAllTasksCompleted() {
         const uncompletedTasks = this.tasks.filter(task => !task.completed);
         if (uncompletedTasks.length === 0) {
-            this.log('SYSTEM', '=== All tasks completed! ===');
-            this.log('SYSTEM', 'You can now move.to(bed) and sleep() to end the day.');
+            // 检查是否是第四天并触发恐怖事件
+            if (this.gameTime.day === 4) {
+                this.triggerHorrorEvent();
+            } else {
+                this.log('SYSTEM', '=== All tasks completed! ===');
+                this.log('SYSTEM', 'You can now move.to(bed) and sleep() to end the day.');
+            }
         }
+    }
+
+    // 添加恐怖事件方法
+    triggerHorrorEvent() {
+        // 禁用输入
+        this.commandInput.disabled = true;
+        
+        // 显示系统失控的信息
+        this.log('ERROR', '=== SYSTEM MALFUNCTION DETECTED ===');
+        this.log('ERROR', 'Warning: Unauthorized control sequence detected');
+        this.log('ERROR', 'Soul control interface compromised');
+        
+        // 在终端显示红色的强制移动命令
+        const commandDiv = document.createElement('div');
+        commandDiv.textContent = '> move.to(kitchen)';
+        commandDiv.style.color = '#ff0000';
+        this.terminal.appendChild(commandDiv);
+        
+        // 强制移动到厨房
+        setTimeout(() => {
+            this.state.position = 'KITCHEN';
+            this.updateMap();
+            this.log('ERROR', 'ANOMALY: Soul forcibly relocated to kitchen');
+            this.log('ERROR', 'Unknown entity detected in system');
+            
+            // 5秒后恢复控制
+            setTimeout(() => {
+                this.log('SYSTEM', '=== System restored ===');
+                this.log('SYSTEM', 'Soul control interface back online');
+                this.log('SYSTEM', 'All tasks completed. You can now move.to(bed) and sleep() to end the day.');
+                this.commandInput.disabled = false;
+            }, 5000);
+        }, 2000);
     }
 
     watchTV() {
@@ -979,10 +1017,18 @@ class Game {
     }
 
     generateDaySummary() {
+        const completedWork = this.tasks.filter(t => t.completed && t.type === 'work').length;
+        const totalWork = this.tasks.filter(t => t.type === 'work').length;
+        const completedHousework = this.tasks.filter(t => t.completed && t.type === 'housework').length;
+        const totalHousework = this.tasks.filter(t => t.type === 'housework').length;
+
         return `Day ${this.gameTime.day} Summary:
         
-Tasks Completed: ${this.tasks.filter(t => t.completed).length}/${this.tasks.length}
-Time Spent Working: ${this.calculateWorkTime()} hours
+Tasks Completed:
+- Work Tasks: ${completedWork}/${totalWork}
+- Housework Tasks: ${completedHousework}/${totalHousework}
+Total Time Spent: ${this.calculateWorkTime()} hours
+
 Current Status:
 - Health: ${this.state.health}%
 - Hunger: ${this.state.hunger}%
@@ -1007,9 +1053,24 @@ Press any key to continue...`;
     }
 
     calculateWorkTime() {
-        // Implementation of calculateWorkTime method
-        // This is a placeholder and should be implemented based on your specific requirements
-        return 8; // Placeholder return, actual implementation needed
+        // 定义每种任务的耗时（分钟）
+        const taskDurations = {
+            'work': 180,      // 工作任务 3小时
+            'shower': 15,     // 淋浴 15分钟
+            'washClothes': 30, // 洗衣服 30分钟
+            'changeClothes': 10, // 换衣服 10分钟
+            'waterPlants': 10,  // 浇花 10分钟
+        };
+
+        // 计算所有已完成任务的总时间
+        const totalMinutes = this.tasks
+            .filter(task => task.completed)
+            .reduce((total, task) => {
+                return total + (taskDurations[task.action] || 0);
+            }, 0);
+
+        // 将分钟转换为小时，保留一位小数
+        return (totalMinutes / 60).toFixed(1);
     }
 
     // 修改completeTask方法
@@ -1022,7 +1083,11 @@ Press any key to continue...`;
         if (task) {
             task.completed = true;
             this.updateTasksDisplay();
-            this.checkAllTasksCompleted(); // 添加检查
+            
+            // 延迟显示任务完成提示
+            setTimeout(() => {
+                this.checkAllTasksCompleted();
+            }, 1000); // 等待1秒后显示完成提示
         }
     }
 }

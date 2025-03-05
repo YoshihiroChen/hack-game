@@ -338,4 +338,18 @@ log(type, message) {
     border-right: 2px solid #0f0;
     white-space: nowrap;
     animation: typing 3.5s steps(40, end), blink-caret .75s step-end infinite;
+}
+
+/* 添加系统故障的闪烁效果 */
+@keyframes system-malfunction {
+    0% { opacity: 1; }
+    25% { opacity: 0.3; }
+    50% { opacity: 1; }
+    75% { opacity: 0.3; }
+    100% { opacity: 1; }
+}
+
+.system-malfunction {
+    animation: system-malfunction 0.5s infinite;
+    color: #ff0000;
 } 
