@@ -228,9 +228,9 @@ body {
     100% { opacity: 1; }
 }
 
-/* 添加教程文本样式 */
+/* 修改教程文本样式 */
 .tutorial {
-    color: #00ffff;  /* 使用青色来区分教程文本 */
+    color: #ffff00;  /* 改为黄色 */
     font-weight: bold;
 }
 

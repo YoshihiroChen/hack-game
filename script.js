@@ -190,6 +190,7 @@ class Game {
         div.textContent = `[${type}] ${message}`;
         if (type === 'ERROR') div.classList.add('error');
         if (type === 'WARNING') div.classList.add('warning');
+        if (type === 'TUTORIAL') div.classList.add('tutorial');
         this.systemLog.appendChild(div);
         this.systemLog.scrollTop = this.systemLog.scrollHeight;
     }
@@ -690,7 +691,8 @@ class Game {
             {
                 title: 'Basic Controls Guide',
                 content: [
-                    'Welcome to the Programmer\'s Life Simulator. You need to balance your basic needs while coding.',
+                    'Welcome to the Soul Control System. You can accomplish various tasks by controlling your soul.',
+                    '& represents your physical body at the desk, while @ represents your soul that you can control.',
                     'The @ symbol on the map marks your current position.',
                     'You can use these basic commands:',
                     '1. move.to(location) - Move to a specific location',
@@ -767,9 +769,9 @@ class Game {
         
         const showNextLine = () => {
             if (currentSection >= tutorial.length) {
-                // 教程结束，恢复原始命令处理
+                // 教程结束时的提示
                 this.log('SYSTEM', 'Tutorial completed! Try typing "help" to see all commands, or "scan()" to check your surroundings.');
-                this.log('SYSTEM', 'Enjoy your game!');
+                this.log('SYSTEM', 'Enjoy your life!');
                 
                 // 恢复原始的handleCommand方法
                 this.handleCommand = originalHandleCommand;
