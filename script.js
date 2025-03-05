@@ -470,7 +470,8 @@ class Game {
         this.log('SYSTEM', 'Taking a shower...');
         setTimeout(() => {
             this.state.clean = Math.min(100, this.state.clean + 50);
-            this.advanceTime(15); // 淋浴花费15分钟
+            this.state.hunger = Math.max(0, this.state.hunger - 5); // 洗澡消耗5点饥饿值
+            this.advanceTime(15);
             this.completeTask('SHOWER', 'shower');
             this.updateStatus();
             this.log('SYSTEM', 'Shower complete. Feeling fresh!');
@@ -581,7 +582,6 @@ class Game {
             return;
         }
 
-        // 找到第一个未完成的工作任务
         const nextTask = this.tasks.find(task => !task.completed && task.type === 'work');
         if (!nextTask) {
             this.log('SYSTEM', 'No more work tasks to complete!');
@@ -592,11 +592,22 @@ class Game {
         setTimeout(() => {
             nextTask.completed = true;
             this.state.sanity = Math.max(0, this.state.sanity - 10);
-            this.advanceTime(30); // 工作花费30分钟
+            this.state.hunger = Math.max(0, this.state.hunger - 25); // 工作3小时，消耗25点饥饿值
+            this.advanceTime(180); // 工作花费3小时
             this.updateStatus();
             this.updateTasksDisplay();
             this.log('SYSTEM', `Completed task: ${nextTask.description}`);
+            this.checkAllTasksCompleted();
         }, 5000);
+    }
+
+    // 添加检查所有任务是否完成的方法
+    checkAllTasksCompleted() {
+        const uncompletedTasks = this.tasks.filter(task => !task.completed);
+        if (uncompletedTasks.length === 0) {
+            this.log('SYSTEM', '=== All tasks completed! ===');
+            this.log('SYSTEM', 'You can now move.to(bed) and sleep() to end the day.');
+        }
     }
 
     watchTV() {
@@ -620,7 +631,8 @@ class Game {
         this.log('SYSTEM', 'Watering plants...');
         setTimeout(() => {
             this.state.sanity = Math.min(100, this.state.sanity + 5);
-            this.advanceTime(10); // 浇花花费10分钟
+            this.state.hunger = Math.max(0, this.state.hunger - 5); // 浇花消耗5点饥饿值
+            this.advanceTime(10);
             this.completeTask('PLANTS', 'waterPlants');
             this.updateStatus();
             this.log('SYSTEM', 'Plants watered. The greenery is soothing.');
@@ -635,7 +647,8 @@ class Game {
         this.log('SYSTEM', 'Changing clothes...');
         setTimeout(() => {
             this.state.clean = Math.min(100, this.state.clean + 20);
-            this.advanceTime(10); // 换衣服花费10分钟
+            this.state.hunger = Math.max(0, this.state.hunger - 3); // 换衣服消耗3点饥饿值
+            this.advanceTime(10);
             this.completeTask('WARDROBE', 'changeClothes');
             this.updateStatus();
             this.log('SYSTEM', 'Changed into fresh clothes. Feeling neat!');
@@ -663,7 +676,8 @@ class Game {
         this.log('SYSTEM', 'Washing clothes...');
         setTimeout(() => {
             this.state.clean = Math.min(100, this.state.clean + 40);
-            this.advanceTime(30); // 洗衣花费30分钟
+            this.state.hunger = Math.max(0, this.state.hunger - 8); // 洗衣服消耗8点饥饿值
+            this.advanceTime(30);
             this.completeTask('WASHER', 'washClothes');
             this.updateStatus();
             this.log('SYSTEM', 'Laundry complete! Your clothes are fresh and clean.');
@@ -843,8 +857,7 @@ class Game {
             { description: "Take a shower", location: "SHOWER", action: "shower" },
             { description: "Do laundry", location: "WASHER", action: "washClothes" },
             { description: "Change clothes", location: "WARDROBE", action: "changeClothes" },
-            { description: "Water the plants", location: "PLANTS", action: "waterPlants" },
-            { description: "Cook a meal", location: "STOVE", action: "cook" }
+            { description: "Water the plants", location: "PLANTS", action: "waterPlants" }
         ];
 
         // 随机选择2-3个工作任务
@@ -859,9 +872,9 @@ class Game {
                 completed: false
             }));
 
-        // 随机选择2-3个家务任务
+        // 固定选择3个家务任务
         const selectedHouseworkTasks = this.shuffleArray(houseworkTasks)
-            .slice(0, 2 + Math.floor(Math.random() * 2))
+            .slice(0, 3)  // 改为固定选择3个
             .map((task, id) => ({
                 id: id + selectedWorkTasks.length + 1,
                 description: task.description,
@@ -997,7 +1010,7 @@ Press any key to continue...`;
         return 8; // Placeholder return, actual implementation needed
     }
 
-    // 添加一个通用的任务完成方法
+    // 修改completeTask方法
     completeTask(location, action) {
         const task = this.tasks.find(t => 
             t.location === location && 
@@ -1007,6 +1020,7 @@ Press any key to continue...`;
         if (task) {
             task.completed = true;
             this.updateTasksDisplay();
+            this.checkAllTasksCompleted(); // 添加检查
         }
     }
 }
