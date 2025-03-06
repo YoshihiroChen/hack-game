@@ -258,8 +258,7 @@ log(type, message) {
 
 /* 添加实体位置标记的样式 */
 .physical-body {
-    color: #ff0; /* 黄色 */
-    display: inline;
+    color: #ffff00;
     animation: blink-position 1s infinite;
 }
 

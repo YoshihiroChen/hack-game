@@ -117,6 +117,14 @@ class Game {
         if (command.toLowerCase().startsWith('move.to(')) {
             cmd = 'move';
             args = command.slice(8, -1).toUpperCase(); // 提取括号中的内容并转换为大写
+        } else if (command.toLowerCase().startsWith('test.day(')) {
+            // 处理 test.day(number) 格式的命令
+            cmd = 'test.day';
+            args = command.slice(9, -1); // 提取括号中的数字
+        } else if (command.toLowerCase().startsWith('test.')) {
+            // 处理 test.number 格式的命令
+            cmd = 'test.day';
+            args = command.slice(5); // 提取数字部分
         } else {
             // 处理其他命令
             cmd = command.replace(/[()]/g, '').toLowerCase(); // 移除括号并转为小写
@@ -182,6 +190,14 @@ class Game {
             case 'cleanfloor':
                 this.cleanfloor();
                 break;
+            case 'test.day':
+                const day = parseInt(args);
+                if (!isNaN(day)) {
+                    this.testJumpToDay(day);
+                } else {
+                    this.log('ERROR', 'Invalid day number');
+                }
+                break;
             default:
                 this.log('ERROR', `Unknown command: ${cmd}`);
         }
@@ -212,6 +228,16 @@ class Game {
 
         // 创建地图副本
         let currentMap = [...this.map];
+        
+        // 第8-9天时修改浴室的显示
+        if (this.gameTime.day >= 8 && this.gameTime.day <= 9) {
+            // 修改第3行（索引2）的浴室部分
+            const line = currentMap[2];
+            const bathroomStart = line.lastIndexOf('[=]');
+            const beforeBathroom = line.substring(0, bathroomStart);
+            const afterBathroom = line.substring(bathroomStart + 3);
+            currentMap[2] = beforeBathroom + '[' + '<span style="color: #ff0000; animation: blink 1s infinite">@</span>' + ']' + afterBathroom;
+        }
         
         // 清空原有内容
         this.asciiMap.innerHTML = '';
@@ -286,7 +312,8 @@ class Game {
     // 添加辅助方法来创建带样式的span元素
     createTextSpan(text) {
         const span = document.createElement('span');
-        span.textContent = text;
+        // 使用innerHTML来渲染HTML标签
+        span.innerHTML = text;
         return span;
     }
 
@@ -377,6 +404,14 @@ class Game {
     }
 
     movePlayer(location) {
+        // 第8-9天禁止进入浴室
+        if ((location === 'BATHROOM' || location === 'SHOWER') && 
+            this.gameTime.day >= 8 && this.gameTime.day <= 9) {
+            this.log('ERROR', 'ACCESS DENIED');
+            this.log('ERROR', 'The bathroom door appears to be locked from the inside...');
+            return;
+        }
+        
         this.log('SYSTEM', `Attempting to move to: ${location}`);
         
         if (!location) {
@@ -980,12 +1015,16 @@ class Game {
         const workTasks = this.gameTime.day >= 7 ? abnormalWorkTasks : normalWorkTasks;
 
         // 家务任务池
-        const houseworkTasks = [
-            { description: "Take a shower", location: "SHOWER", action: "shower" },
+        let houseworkTasks = [
             { description: "Do laundry", location: "WASHER", action: "washClothes" },
             { description: "Change clothes", location: "WARDROBE", action: "changeClothes" },
             { description: "Water the plants", location: "PLANTS", action: "waterPlants" }
         ];
+
+        // 只在非第8-9天添加淋浴任务
+        if (this.gameTime.day < 8 || this.gameTime.day > 9) {
+            houseworkTasks.push({ description: "Take a shower", location: "SHOWER", action: "shower" });
+        }
 
         // 从第二天开始添加打扫任务
         if (this.gameTime.day >= 2) {
@@ -1130,13 +1169,13 @@ Current Status:
 - Clean: ${this.state.clean}%
 - Sanity: ${this.state.sanity}%\n`;
 
-        // 添加恐怖事件日志（使用黄色字体）
-        if (this.gameTime.day === 4) {
-            summary += `\n<span style="color: #ffff00">Anomalies Detected:
-- System malfunction occurred
-- Soul control interface was temporarily compromised
-- Unauthorized movement to kitchen was detected
-- Unknown entity presence was registered in the system</span>\n`;
+        // 添加恐怖事件日志
+        if (this.gameTime.day === 8 || this.gameTime.day === 9) {
+            summary += `\n<span style="color: #ff0000">WARNING: Anomaly Detected in Bathroom
+- Unknown entity detected
+- Bathroom access restricted
+- Entity showing signs of hostility
+- Exercise extreme caution</span>\n`;
         } else if (this.gameTime.day === 6) {
             summary += `\n<span style="color: #ffff00">Anomalies Detected:
 - Soul initialization error occurred
@@ -1279,6 +1318,13 @@ Current Status:
         }
 
         return true;
+    }
+
+    // 添加测试跳转方法
+    testJumpToDay(day) {
+        this.gameTime.day = day - 1; // 减1是因为startNewDay会加1
+        this.startNewDay();
+        this.log('SYSTEM', `=== Jumped to Day ${day} (Test Mode) ===`);
     }
 }
 
