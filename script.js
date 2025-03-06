@@ -914,8 +914,8 @@ class Game {
 
     // 任务系统
     generateDailyTasks() {
-        // 工作任务池
-        const workTasks = [
+        // 正常的工作任务池
+        const normalWorkTasks = [
             "Fix website bug",
             "Review pull requests",
             "Write documentation",
@@ -925,6 +925,21 @@ class Game {
             "Optimize database queries",
             "Update dependencies"
         ];
+
+        // 异常的工作任务池（从第7天开始使用）
+        const abnormalWorkTasks = [
+            "01010‡‡‡ERROR‡‡‡01010",
+            "§¶¥®©¤₪CORRUPT_DATA₪¤©®¥¶§",
+            "∞∞∞SYSTEM_BREACH∞∞∞",
+            "████REDACTED████",
+            "E̷R̷R̷O̷R̷_̷4̷0̷4̷",
+            "D̸E̸L̸E̸T̸E̸_̸A̸L̸L̸_̸T̸R̸A̸C̸E̸S̸",
+            "C̷̨̭̘̲͎̅͌͑͝O̶͉̦͋̈́̈́͝R̸̡͚̲̆̈́̈́R̵͙̫̆̓U̷̢͇̇̈́P̷̱͉̏̓̈́T̴͎̫̏_̷͇̇D̷͚̆A̷̛͚T̷̫͌A̷͚̐",
+            "U̷̧͉̼͇͎͍͔̝͊̃͜N̴̢̧̛̺̱̱̗̩̱̫̈́̈́̈́̈̊̈́̕K̷̡̢̛͚̣͚̱̭̲̈́̈́̈́̈́̈́͜N̴̢̛̺̱̱̗̩̱̫̈́̈́̈̊̈́̕O̷̧͉̼͇͎͍͔̝͊̃͜W̷̧͉̼͇͎͍͔̝͊̃͜N̴̢̧̛̺̱̱̗̩̱̫̈́̈́̈̈̊̈́̕"
+        ];
+
+        // 选择使用哪个任务池
+        const workTasks = this.gameTime.day >= 7 ? abnormalWorkTasks : normalWorkTasks;
 
         // 家务任务池
         const houseworkTasks = [
@@ -1081,6 +1096,13 @@ Current Status:
 - Unexpected starting position: KITCHEN
 - System reported location mismatch
 - Investigation of the anomaly is ongoing</span>\n`;
+        } else if (this.gameTime.day >= 7) {
+            summary += `\n<span style="color: #ffff00">Anomalies Detected:
+- System corruption detected
+- Work task data corrupted
+- Unexpected soul location at day start: KITCHEN
+- Entity interference level increasing
+- Further investigation required</span>\n`;
         }
 
         summary += '\nPress any key to continue...';
@@ -1093,15 +1115,15 @@ Current Status:
         this.gameTime.minute = 0;
         
         // 根据天数设置起始位置
-        if (this.gameTime.day === 6) {
-            // 第六天的恐怖事件
+        if (this.gameTime.day === 1) {
+            this.state.position = 'DESK';  // 第一天在书桌前醒来
+        } else if (this.gameTime.day >= 6) {
+            // 从第六天开始每天都在厨房醒来
             this.state.position = 'KITCHEN';  // 灵魂在厨房醒来
             this.log('WARNING', 'ERROR: Wrong location');
             this.log('WARNING', 'Soul initialization failed - unexpected starting position');
-        } else if (this.gameTime.day === 1) {
-            this.state.position = 'DESK';  // 第一天在书桌前醒来
         } else {
-            this.state.position = 'BED';   // 其他天数在床上醒来
+            this.state.position = 'BED';   // 2-5天在床上醒来
         }
         
         this.generateDailyTasks();
