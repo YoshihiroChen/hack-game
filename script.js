@@ -1568,10 +1568,56 @@ Current Status:
             return;
         }
         
+        // 创建片尾容器
+        const credits = document.createElement('div');
+        credits.className = 'credits';
+        
+        // 片尾信息数组
+        const creditLines = [
+            { text: 'First Work of Yoshihiro Chen', color: '#00ff00' },
+            { text: 'Designer: Yoshihiro Chen', color: '#00ff00' },
+            { text: 'Who are you?', color: '#ffff00' },
+            { text: 'Exit()', color: '#00ff00', isLast: true }
+        ];
+
+        // 先等待2秒后开始黑屏
         setTimeout(() => {
-            // 游戏结束，黑屏
             document.body.style.backgroundColor = '#000';
             document.body.innerHTML = '';
+            
+            // 黑屏持续3秒后开始显示片尾
+            setTimeout(() => {
+                document.body.appendChild(credits);
+                
+                // 开始显示片尾
+                let index = 0;
+                const showNextLine = () => {
+                    if (index >= creditLines.length) {
+                        // 最后一行显示完2秒后关闭游戏
+                        setTimeout(() => {
+                            window.close();  // 尝试关闭窗口
+                            // 如果window.close()不起作用，至少清空页面
+                            document.body.innerHTML = '';
+                        }, 2000);
+                        return;
+                    }
+                    
+                    const line = creditLines[index];
+                    credits.innerHTML = `<div class="credit-line" style="color: ${line.color}">${line.text}</div>`;
+                    
+                    // 显示当前行2秒
+                    setTimeout(() => {
+                        credits.innerHTML = '';  // 清空
+                        // 等待2秒后显示下一行
+                        setTimeout(() => {
+                            index++;
+                            showNextLine();
+                        }, 2000);
+                    }, 2000);
+                };
+
+                showNextLine();
+            }, 3000);
         }, 2000);
     }
 }
