@@ -138,6 +138,14 @@ class Game {
             }
         }
 
+        // 第13天只允许特定命令
+        if (this.finalDay) {
+            if (!['grab', 'stab'].includes(cmd)) {
+                this.log('ERROR', 'Cannot perform this action');
+                return;
+            }
+        }
+
         // 命令处理
         switch(cmd) {
             case 'help':
@@ -212,6 +220,12 @@ class Game {
             case 'lock':
                 this.lockBedroom();
                 break;
+            case 'grab':
+                this.grabKnife();
+                break;
+            case 'stab':
+                this.stabAction();
+                break;
             default:
                 this.log('ERROR', `Unknown command: ${cmd}`);
         }
@@ -270,7 +284,7 @@ class Game {
         for (let i = 0; i < currentMap.length; i++) {
             if (i === 2) { // DESK所在的行
                 const line = currentMap[i];
-                const deskStart = line.indexOf('[=') + 2;  // 找到[=的位置并加2
+                const deskStart = line.indexOf('[=') + 2;
                 const playerPos = this.locations[this.state.position];
                 
                 // 分三段：desk之前、desk标记、desk之后
@@ -289,8 +303,12 @@ class Game {
                     this.asciiMap.appendChild(this.createTextSpan(beforeDesk));
                 }
                 
-                // 添加desk标记（&）
-                this.asciiMap.appendChild(this.createBodySpan('&'));
+                // 只在非第12天且非物理本体消失时显示&
+                if (!this.physicalBodyMissing) {
+                    this.asciiMap.appendChild(this.createBodySpan('&'));
+                } else {
+                    this.asciiMap.appendChild(this.createTextSpan('='));  // 用=替代&
+                }
                 
                 // 添加desk之后的内容
                 if (playerPos && playerPos.y === 2 && playerPos.x > deskStart) {
@@ -428,11 +446,9 @@ class Game {
     }
 
     movePlayer(location) {
-        // 第8-9天禁止进入浴室
-        if ((location === 'BATHROOM' || location === 'SHOWER') && 
-            this.gameTime.day >= 8 && this.gameTime.day <= 9) {
-            this.log('ERROR', 'ACCESS DENIED');
-            this.log('ERROR', 'The bathroom door appears to be locked from the inside...');
+        if (this.physicalBodyMissing && location === 'DESK') {
+            this.log('ERROR', 'Physical body not found');
+            this.log('SYSTEM', 'Try using scan() at DESK');
             return;
         }
         
@@ -544,6 +560,22 @@ class Game {
             return;
         }
 
+        // 第12天可以直接睡觉
+        if (this.gameTime.day === 12 && this.storyBranch === 'lock') {
+            this.log('SYSTEM', 'Going to sleep...');
+            setTimeout(() => {
+                this.showDayEndModal();
+            }, 3000);
+            return;
+        }
+
+        // 检查是否完成所有任务
+        const allTasksCompleted = this.tasks.every(task => task.completed);
+        if (!allTasksCompleted && !this.physicalBodyMissing) {
+            this.log('ERROR', 'Must complete all tasks before sleeping');
+            return;
+        }
+
         // 检查是否有未完成的任务
         const uncompletedTasks = this.tasks.filter(task => !task.completed);
         if (uncompletedTasks.length > 0) {
@@ -589,6 +621,20 @@ class Game {
     }
 
     scanSurroundings() {
+        if (this.physicalBodyMissing) {
+            if (this.state.position === 'DESK' && this.clueFound === 0) {
+                this.log('WARNING', '(1/2) Find me, I am where I was');  // 使用WARNING类型会显示为黄色
+                this.clueFound = 1;
+                return;
+            } else if (this.state.position === 'SHOWER' && this.clueFound === 1) {
+                this.log('WARNING', '(2/2) Who are you?');  // 使用WARNING类型会显示为黄色
+                setTimeout(() => {
+                    this.log('SYSTEM', 'You feel tired. You need to sleep.');
+                    this.needCheckBody = false;  // 允许直接睡觉
+                }, 2000);
+                return;
+            }
+        }
         if (this.bodyCompromised && this.state.position === 'DESK') {
             this.log('WARNING', 'Something feels wrong with your body. It doesn\'t feel like yourself anymore.');
             return;
@@ -1210,7 +1256,14 @@ Current Status:
 - Unexpected starting position: KITCHEN
 - System reported location mismatch
 - Investigation of the anomaly is ongoing</span>\n`;
-        } else if (this.gameTime.day >= 7 && this.gameTime.day !== 10) {  // 添加条件，排除第10天
+        } else if (this.gameTime.day === 12 && this.storyBranch === 'lock') {
+            summary += `\n<span style="color: #ff0000">WARNING: Critical System Error
+- Physical body missing from desk
+- Unknown messages detected
+- System stability severely compromised
+- Emergency protocols initiated
+- Further investigation required</span>\n`;
+        } else if (this.gameTime.day >= 7 && this.gameTime.day !== 10 && this.gameTime.day !== 12) {  // 添加条件，排除第10天和第12天
             summary += `\n<span style="color: #ffff00">Anomalies Detected:
 - System corruption detected
 - Work task data corrupted
@@ -1244,12 +1297,25 @@ Current Status:
         this.gameTime.hour = 9;
         this.gameTime.minute = 0;
         
-        // 根据天数设置起始位置
-        if (this.gameTime.day === 1) {
-            this.state.position = 'DESK';  // 第一天在书桌前醒来
+        if (this.storyBranch === 'lock') {  // 分支二的特殊处理
+            if (this.gameTime.day === 12) {
+                this.state.position = 'DESK';
+                this.physicalBodyMissing = true;  // 添加标记表示本体消失
+                this.clueFound = 0;  // 用于追踪找到的线索数量
+            } else if (this.gameTime.day === 13) {
+                this.state.position = 'KITCHEN';
+                this.physicalBodyMissing = false;  // 本体回来了
+                this.finalDay = true;  // 最终日标记
+                setTimeout(() => {
+                    this.log('WARNING', 'Grab the knife');
+                    this.log('WARNING', 'Type grab() to take the knife');
+                }, 1000);
+            } else if (this.gameTime.day === 11) {
+                this.state.position = 'KITCHEN';  // 第11天在厨房醒来
+            }
         } else if (this.gameTime.day === 10) {
             this.state.position = 'BED';  // 第十天在床上醒来
-            this.triggerDay10Event();  // 触发第十天的特殊事件
+            this.triggerDay10Event();
         } else if (this.gameTime.day >= 6) {
             this.state.position = 'KITCHEN';  // 第6-9天在厨房醒来
             this.log('WARNING', 'ERROR: Wrong location');
@@ -1465,6 +1531,47 @@ Current Status:
                     this.log('SYSTEM', 'Everything is back to normal');
                 }, 3000);
             }, 2000);
+        }, 2000);
+    }
+
+    // 添加新的方法处理第13天的特殊事件
+    grabKnife() {
+        if (!this.finalDay) {
+            this.log('ERROR', 'Cannot perform this action');
+            return;
+        }
+        
+        this.hasKnife = true;
+        this.log('WARNING', 'Knife acquired');
+        
+        // 自动移动到desk
+        setTimeout(() => {
+            const moveCommand = 'move.to(DESK)';
+            const commandDiv = document.createElement('div');
+            commandDiv.textContent = `> ${moveCommand}`;
+            commandDiv.style.color = '#ff0000';
+            this.terminal.appendChild(commandDiv);
+            
+            this.state.position = 'DESK';
+            this.updateMap();
+            
+            setTimeout(() => {
+                this.log('WARNING', 'Use the knife to stab');
+                this.log('WARNING', 'Type stab() to end this');
+            }, 1000);
+        }, 2000);
+    }
+
+    stabAction() {
+        if (!this.finalDay || !this.hasKnife) {
+            this.log('ERROR', 'Cannot perform this action');
+            return;
+        }
+        
+        setTimeout(() => {
+            // 游戏结束，黑屏
+            document.body.style.backgroundColor = '#000';
+            document.body.innerHTML = '';
         }, 2000);
     }
 }
