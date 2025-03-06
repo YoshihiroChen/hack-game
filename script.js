@@ -18,7 +18,7 @@ class Game {
             "|      |     LIVING          |",
             "|      | [===]     [##]      |",
             "|BALC  |  SOFA      TV       |",
-            "| [W]  |                     |",
+            "| [W]  |     [F*]            |",
             "| P C  |            +--------+",
             "+------+------------+KITCHEN |",
             "                    |[##] F  |",
@@ -47,7 +47,8 @@ class Game {
             "SOFA": { x: 17, y: 6 },       // 修改坐标让@显示在[===]中间
             "TV": { x: 21, y: 6 },
             "PLANTS": { x: 2, y: 8 },
-            "CHAIR": { x: 4, y: 8 }
+            "CHAIR": { x: 4, y: 8 },
+            "FLOOR": { x: 13, y: 8 }  // 添加地板的位置
         };
 
         // 添加时间系统
@@ -177,6 +178,9 @@ class Game {
                 break;
             case 'checkbody':
                 this.checkBody();
+                break;
+            case 'cleanfloor':
+                this.cleanfloor();
                 break;
             default:
                 this.log('ERROR', `Unknown command: ${cmd}`);
@@ -357,13 +361,17 @@ class Game {
             '  Study: desk, bookshelf',
             '  Bathroom: shower, sink',
             '  Kitchen: fridge, stove',
-            '  Living: sofa, tv',
+            '  Living: sofa, tv, floor',
             '  Balcony: washer, plants, chair',
             'status() - Show current status',
             'scan() - Scan surroundings',
             '',
             'You can also move directly to specific items. When at an item, you can interact with it.',
-            'checkbody() - Check your physical body at desk (required before sleep from Day 5)'
+            '',
+            'Game Objective:',
+            '- Complete all daily tasks',
+            '- Maintain your status bars',
+            '- Go to bed and sleep when tasks are done'
         ];
         commands.forEach(cmd => this.appendToTerminal(cmd));
     }
@@ -409,7 +417,8 @@ class Game {
                 description: 'You are in the living room. You can move to:',
                 items: {
                     'SOFA': 'watchtv() to relax and watch TV',
-                    'TV': 'move.to(SOFA) to watch TV'
+                    'TV': 'move.to(SOFA) to watch TV',
+                    'FLOOR': 'cleanfloor() to sweep and mop'  // 添加新的交互选项
                 }
             },
             'BALCONY': {
@@ -493,6 +502,7 @@ class Game {
     }
 
     shower() {
+        if (!this.checkStateForAction('shower')) return;
         if (this.state.position !== 'SHOWER') {
             this.log('ERROR', 'Must be at SHOWER to take a shower');
             return;
@@ -533,7 +543,8 @@ class Game {
             'PLANTS': 'Some potted plants on the peaceful balcony.',
             'CHAIR': 'A comfortable outdoor chair perfect for relaxation.',
             'WARDROBE': 'A spacious wardrobe with your clothes neatly organized.',
-            'WASHER': 'A modern washing machine in the living room.'
+            'WASHER': 'A modern washing machine in the living room.',
+            'FLOOR': 'A clean floor in the living room.'
         };
         this.log('SYSTEM', `Scanning current location: ${this.state.position}`);
         this.log('SYSTEM', surroundings[this.state.position] || 'Nothing special here');
@@ -607,6 +618,7 @@ class Game {
     }
 
     work() {
+        if (!this.checkStateForAction('work')) return;
         if (this.state.position !== 'DESK') {
             this.log('ERROR', 'Must be at DESK to work');
             return;
@@ -684,6 +696,7 @@ class Game {
     }
 
     watchTV() {
+        if (!this.checkStateForAction('watchtv')) return;
         if (this.state.position !== 'SOFA') {  // 只检查是否在沙发位置
             this.log('ERROR', 'Must be at SOFA to watch television');
             return;
@@ -697,6 +710,7 @@ class Game {
     }
 
     waterPlants() {
+        if (!this.checkStateForAction('waterplants')) return;
         if (this.state.position !== 'PLANTS') {
             this.log('ERROR', 'Must be at PLANTS to water them');
             return;
@@ -713,6 +727,7 @@ class Game {
     }
 
     changeClothes() {
+        if (!this.checkStateForAction('changeclothes')) return;
         if (this.state.position !== 'WARDROBE') {
             this.log('ERROR', 'Must be at WARDROBE to change clothes');
             return;
@@ -729,6 +744,7 @@ class Game {
     }
 
     relax() {
+        if (!this.checkStateForAction('relax')) return;
         if (this.state.position !== 'CHAIR') {
             this.log('ERROR', 'Must be at CHAIR to relax');
             return;
@@ -742,6 +758,7 @@ class Game {
     }
 
     washClothes() {
+        if (!this.checkStateForAction('washclothes')) return;
         if (this.state.position !== 'WASHER') {
             this.log('ERROR', 'Must be at WASHER to wash clothes');
             return;
@@ -781,7 +798,7 @@ class Game {
                     '- Study: Has a desk(DESK) and bookshelf(BOOKSHELF)',
                     '- Bathroom: Has a shower(SHOWER)',
                     '- Kitchen: Has a fridge(FRIDGE) and stove(STOVE)',
-                    '- Living Room: Has a sofa(SOFA) and TV(TV)',
+                    '- Living Room: Has a sofa(SOFA), TV(TV) and floor(FLOOR)',
                     '- Balcony: Has plants(PLANTS) and chair(CHAIR)',
                     '- Washer: Has a washing machine(WASHER)'
                 ]
@@ -791,22 +808,43 @@ class Game {
                 content: [
                     'Different locations allow different activities:',
                     '- At bed: sleep() - Restore mental health',
-                    '- At shower: shower() - Improve cleanliness',
-                    '- At fridge: eat() - Restore hunger',
-                    '- At desk: work() - Code and work',
-                    '- At sofa: watchTV() - Relax',
-                    '- At washer: washClothes() - Clean your clothes',
-                    '- At balcony: relax() - Enjoy fresh air'
+                    '- At shower: shower() - Improve cleanliness (+50 clean)',
+                    '- At fridge: eat() - Restore hunger (+30 hunger)',
+                    '- At stove: cook() - Cook a better meal (+60 hunger)',
+                    '- At desk: work() - Code and complete work tasks',
+                    '- At bookshelf: read() - Gain knowledge (+20 sanity)',
+                    '- At sofa: watchtv() - Relax and restore sanity (+15 sanity)',
+                    '- At washer: washclothes() - Clean your clothes (+40 clean)',
+                    '- At wardrobe: changeclothes() - Change into clean clothes (+20 clean)',
+                    '- At plants: waterplants() - Take care of plants (+5 sanity)',
+                    '- At chair: relax() - Enjoy fresh air (+25 sanity)',
+                    '- At floor: cleanfloor() - Clean the living room floor (+30 clean)'
                 ]
             },
             {
                 title: 'Status Management',
                 content: [
                     'You need to monitor these status bars:',
-                    '- Hunger: Need regular meals from fridge',
-                    '- Clean: Need showers and change of clothes',
-                    '- Sanity: Need rest and entertainment',
-                    'You\'ll receive warnings when any status drops below 20%'
+                    '- Hunger: Decreases over time (-1 per minute)',
+                    '  * Eat at fridge (+30) or cook at stove (+60)',
+                    '  * Working decreases hunger (-25)',
+                    '  * Other activities also decrease hunger slightly',
+                    '',
+                    '- Clean: Decreases slowly (-0.5 per minute)',
+                    '  * Shower (+50)',
+                    '  * Change clothes (+20)',
+                    '  * Wash clothes (+40)',
+                    '  * Clean floor (+30)',
+                    '',
+                    '- Sanity: Decreases over time (-0.3 per minute)',
+                    '  * Watch TV (+15)',
+                    '  * Read books (+20)',
+                    '  * Water plants (+5)',
+                    '  * Relax in balcony (+25)',
+                    '  * Working decreases sanity (-10)',
+                    '',
+                    'You\'ll receive warnings when any status drops below 20%',
+                    'Try to maintain a balance between work and self-care'
                 ]
             },
             {
@@ -948,6 +986,15 @@ class Game {
             { description: "Change clothes", location: "WARDROBE", action: "changeClothes" },
             { description: "Water the plants", location: "PLANTS", action: "waterPlants" }
         ];
+
+        // 从第二天开始添加打扫任务
+        if (this.gameTime.day >= 2) {
+            houseworkTasks.push({ 
+                description: "Clean the floor", 
+                location: "FLOOR", 
+                action: "cleanfloor" 
+            });
+        }
 
         // 随机选择2-3个工作任务
         const selectedWorkTasks = this.shuffleArray(workTasks)
@@ -1198,6 +1245,40 @@ Current Status:
             this.needCheckBody = false;  // 重置标记
             this.log('SYSTEM', 'You can now move.to(bed) and sleep() to end the day.');
         }, 3000);
+    }
+
+    cleanfloor() {
+        if (!this.checkStateForAction('cleanfloor')) return;
+        if (this.state.position !== 'FLOOR') {
+            this.log('ERROR', 'Must be at FLOOR to clean');
+            return;
+        }
+        this.log('SYSTEM', 'Cleaning the floor...');
+        setTimeout(() => {
+            this.state.clean = Math.min(100, this.state.clean + 30);
+            this.state.hunger = Math.max(0, this.state.hunger - 10); // 打扫消耗10点饥饿值
+            this.advanceTime(20); // 打扫花费20分钟
+            this.completeTask('FLOOR', 'cleanfloor');
+            this.updateStatus();
+            this.log('SYSTEM', 'Floor cleaned. The room looks much better now!');
+        }, 3000);
+    }
+
+    // 添加状态检查方法
+    checkStateForAction(action) {
+        // 检查饥饿值（低于15时需要进食）
+        if (this.state.hunger <= 15 && !['eat', 'cook'].includes(action)) {
+            this.log('ERROR', 'Too hungry to focus! You need to eat something first.');
+            return false;
+        }
+
+        // 检查精神状态（低于20时不能工作）
+        if (this.state.sanity <= 20 && action === 'work') {
+            this.log('ERROR', 'Mental state too unstable! You need to rest before working.');
+            return false;
+        }
+
+        return true;
     }
 }
 
