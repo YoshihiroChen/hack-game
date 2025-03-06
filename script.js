@@ -67,6 +67,8 @@ class Game {
 
         // 添加新的状态标记
         this.needCheckBody = false;  // 是否需要检查本体
+        this.bodyCompromised = false;  // 身体是否被影响
+        this.storyBranch = null;  // 用于记录剧情分支：'hide' 或 'lock'
 
         this.initialize();
     }
@@ -116,18 +118,24 @@ class Game {
         // 处理 move.to(location) 格式的命令
         if (command.toLowerCase().startsWith('move.to(')) {
             cmd = 'move';
-            args = command.slice(8, -1).toUpperCase(); // 提取括号中的内容并转换为大写
+            args = command.slice(8, -1).toUpperCase();
         } else if (command.toLowerCase().startsWith('test.day(')) {
-            // 处理 test.day(number) 格式的命令
             cmd = 'test.day';
-            args = command.slice(9, -1); // 提取括号中的数字
+            args = command.slice(9, -1);
         } else if (command.toLowerCase().startsWith('test.')) {
-            // 处理 test.number 格式的命令
             cmd = 'test.day';
-            args = command.slice(5); // 提取数字部分
+            args = command.slice(5);
         } else {
-            // 处理其他命令
-            cmd = command.replace(/[()]/g, '').toLowerCase(); // 移除括号并转为小写
+            cmd = command.replace(/[()]/g, '').toLowerCase();
+        }
+
+        // 第10天事件期间只允许hide和lock命令
+        if (this.isDay10EventActive && !this.canMove) {
+            if (!['hide', 'lock'].includes(cmd)) {
+                this.log('ERROR', 'Cannot perform any actions until you make a choice');
+                this.log('SYSTEM', 'Type hide() to hide in wardrobe, or lock() to lock the door');
+                return;
+            }
         }
 
         // 命令处理
@@ -198,6 +206,12 @@ class Game {
                     this.log('ERROR', 'Invalid day number');
                 }
                 break;
+            case 'hide':
+                this.hideInWardrobe();
+                break;
+            case 'lock':
+                this.lockBedroom();
+                break;
             default:
                 this.log('ERROR', `Unknown command: ${cmd}`);
         }
@@ -231,12 +245,22 @@ class Game {
         
         // 第8-9天时修改浴室的显示
         if (this.gameTime.day >= 8 && this.gameTime.day <= 9) {
-            // 修改第3行（索引2）的浴室部分
             const line = currentMap[2];
             const bathroomStart = line.lastIndexOf('[=]');
             const beforeBathroom = line.substring(0, bathroomStart);
             const afterBathroom = line.substring(bathroomStart + 3);
             currentMap[2] = beforeBathroom + '[' + '<span style="color: #ff0000; animation: blink 1s infinite">@</span>' + ']' + afterBathroom;
+        }
+
+        // 如果是第10天的事件，在相应位置添加红色闪烁的@
+        if (this.isDay10EventActive && this.unknownEntity) {
+            const entityPos = this.locations[this.unknownEntity];
+            if (entityPos) {
+                const line = currentMap[entityPos.y];
+                const before = line.substring(0, entityPos.x);
+                const after = line.substring(entityPos.x + 1);
+                currentMap[entityPos.y] = before + '<span style="color: #ff0000; animation: blink 1s infinite">@</span>' + after;
+            }
         }
         
         // 清空原有内容
@@ -565,6 +589,10 @@ class Game {
     }
 
     scanSurroundings() {
+        if (this.bodyCompromised && this.state.position === 'DESK') {
+            this.log('WARNING', 'Something feels wrong with your body. It doesn\'t feel like yourself anymore.');
+            return;
+        }
         const surroundings = {
             'DESK': 'A computer desk with multiple monitors. Your physical body sits here, typing commands endlessly into the terminal while your spirit roams freely.',
             'BED': 'A comfortable bed in the spacious bedroom, rarely used as your body remains at the desk.',
@@ -1182,13 +1210,29 @@ Current Status:
 - Unexpected starting position: KITCHEN
 - System reported location mismatch
 - Investigation of the anomaly is ongoing</span>\n`;
-        } else if (this.gameTime.day >= 7) {
+        } else if (this.gameTime.day >= 7 && this.gameTime.day !== 10) {  // 添加条件，排除第10天
             summary += `\n<span style="color: #ffff00">Anomalies Detected:
 - System corruption detected
 - Work task data corrupted
 - Unexpected soul location at day start: KITCHEN
 - Entity interference level increasing
 - Further investigation required</span>\n`;
+        }
+
+        if (this.gameTime.day === 10) {
+            if (this.storyBranch === 'hide') {
+                summary += `\n<span style="color: #ff0000">WARNING: Critical Event Log
+- Unknown entity detected in living room
+- Entity attempted to reach the spirit in bedroom
+- Emergency protocols were activated
+- Situation contained, but exercise extreme caution</span>\n`;
+            } else if (this.storyBranch === 'lock') {
+                summary += `\n<span style="color: #ff0000">WARNING: Critical Event Log
+- Unknown entity detected in living room
+- Entity attempted to reach physical body
+- Emergency protocols were activated
+- Situation contained, but exercise extreme caution</span>\n`;
+            }
         }
 
         summary += '\nPress any key to continue...';
@@ -1203,9 +1247,11 @@ Current Status:
         // 根据天数设置起始位置
         if (this.gameTime.day === 1) {
             this.state.position = 'DESK';  // 第一天在书桌前醒来
+        } else if (this.gameTime.day === 10) {
+            this.state.position = 'BED';  // 第十天在床上醒来
+            this.triggerDay10Event();  // 触发第十天的特殊事件
         } else if (this.gameTime.day >= 6) {
-            // 从第六天开始每天都在厨房醒来
-            this.state.position = 'KITCHEN';  // 灵魂在厨房醒来
+            this.state.position = 'KITCHEN';  // 第6-9天在厨房醒来
             this.log('WARNING', 'ERROR: Wrong location');
             this.log('WARNING', 'Soul initialization failed - unexpected starting position');
         } else {
@@ -1273,6 +1319,20 @@ Current Status:
             return;
         }
 
+        if (this.bodyCompromised) {
+            this.log('WARNING', 'Something feels wrong with your body. It doesn\'t feel like yourself anymore.');
+            setTimeout(() => {
+                this.log('SYSTEM', 'But you need to continue with your routine...');
+                // 检查是否所有任务都完成了
+                const allTasksCompleted = this.tasks.every(task => task.completed);
+                if (allTasksCompleted) {
+                    this.log('SYSTEM', 'You can now move.to(bed) and sleep() to end the day.');
+                }
+                this.needCheckBody = false;  // 重置标记，允许睡觉
+            }, 2000);
+            return;
+        }
+
         if (!this.needCheckBody) {
             this.log('SYSTEM', 'No need to check your physical body right now.');
             return;
@@ -1325,6 +1385,87 @@ Current Status:
         this.gameTime.day = day - 1; // 减1是因为startNewDay会加1
         this.startNewDay();
         this.log('SYSTEM', `=== Jumped to Day ${day} (Test Mode) ===`);
+    }
+
+    // 添加第十天事件的方法
+    triggerDay10Event() {
+        this.isDay10EventActive = true;  // 添加事件标记
+        this.canMove = false;  // 暂时禁止移动
+        
+        setTimeout(() => {
+            this.log('WARNING', 'You sense a presence in the living room');
+            // 在客厅添加红色闪烁的@
+            this.unknownEntity = 'LIVING';
+            this.updateMap();
+            
+            setTimeout(() => {
+                this.log('SYSTEM', 'Do you want to hide in the wardrobe or lock the bedroom door?');
+                this.log('SYSTEM', 'Type hide() to hide in wardrobe, or lock() to lock the door');
+            }, 1000);
+        }, 1000);
+    }
+
+    // 添加躲藏和锁门的方法
+    hideInWardrobe() {
+        if (!this.isDay10EventActive) {
+            this.log('ERROR', 'Cannot hide right now');
+            return;
+        }
+        
+        this.storyBranch = 'hide';  // 设置为分支一
+        // 隐藏玩家
+        this.state.position = null;
+        this.updateMap();
+        
+        // 未知实体进入bedroom
+        setTimeout(() => {
+            this.unknownEntity = 'BEDROOM';
+            this.updateMap();
+            
+            // 未知实体消失
+            setTimeout(() => {
+                this.unknownEntity = null;
+                this.updateMap();
+                
+                // 玩家从衣柜出来
+                setTimeout(() => {
+                    this.state.position = 'BEDROOM';
+                    this.isDay10EventActive = false;
+                    this.canMove = true;
+                    this.updateMap();
+                    this.log('SYSTEM', 'You came out of the wardrobe. Everything seems back to normal');
+                }, 2000);
+            }, 3000);
+        }, 2000);
+    }
+
+    lockBedroom() {
+        if (!this.isDay10EventActive) {
+            this.log('ERROR', 'Cannot lock door right now');
+            return;
+        }
+        
+        this.storyBranch = 'lock';  // 设置为分支二
+        setTimeout(() => {
+            this.log('WARNING', 'Someone is trying to open the bedroom door');
+            
+            // 两秒后未知实体移动到study
+            setTimeout(() => {
+                this.unknownEntity = 'STUDY';
+                this.updateMap();
+                this.log('WARNING', 'The entity appears to have moved into the study room');
+                
+                // 未知实体消失
+                setTimeout(() => {
+                    this.unknownEntity = null;
+                    this.isDay10EventActive = false;
+                    this.canMove = true;
+                    this.bodyCompromised = true;  // 添加新标记
+                    this.updateMap();
+                    this.log('SYSTEM', 'Everything is back to normal');
+                }, 3000);
+            }, 2000);
+        }, 2000);
     }
 }
 
