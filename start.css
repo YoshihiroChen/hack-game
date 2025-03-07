@@ -1,0 +1,85 @@
+body {
+    margin: 0;
+    padding: 0;
+    background-color: #000;
+    color: #00ff00;
+    font-family: 'Courier New', monospace;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.start-screen {
+    text-align: center;
+}
+
+.game-title {
+    font-size: 72px;
+    margin-bottom: 50px;
+    text-shadow: 0 0 10px #00ff00;
+}
+
+.button-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+button {
+    background: transparent;
+    border: 2px solid #00ff00;
+    color: #00ff00;
+    padding: 15px 40px;
+    font-size: 24px;
+    font-family: 'Courier New', monospace;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+button:hover {
+    background: #00ff00;
+    color: #000;
+}
+
+.intro-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.9);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-content {
+    background: #000;
+    border: 2px solid #00ff00;
+    padding: 30px;
+    width: 80%;
+    max-width: 800px;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.typing-text {
+    color: #00ff00;
+    font-size: 18px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+}
+
+.typing-text::after {
+    content: '|';
+    animation: blink 1s infinite;
+}
+
+@keyframes blink {
+    50% { opacity: 0; }
+}
+
+.hidden {
+    display: none;
+} 
