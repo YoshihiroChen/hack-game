@@ -467,8 +467,10 @@ class Game {
             return;
         }
 
-        // 分支一：第12-13天不能进入bathroom和shower
-        if (this.bathroomEntityActive && (location === 'SHOWER' || location === 'BATHROOM')) {
+        // 第8-9天或分支一的第12-13天不能进入bathroom和shower
+        if (((this.gameTime.day >= 8 && this.gameTime.day <= 9) || 
+             (this.storyBranch === 'hide' && this.gameTime.day >= 12 && this.gameTime.day <= 13)) && 
+            (location === 'SHOWER' || location === 'BATHROOM')) {
             this.log('ERROR', 'ACCESS DENIED');
             this.log('ERROR', 'The bathroom door appears to be locked from the inside...');
             return;
@@ -1257,6 +1259,15 @@ class Game {
 - Hunger: ${this.state.hunger}%
 - Clean: ${this.state.clean}%
 - Sanity: ${this.state.sanity}%\n`;
+
+        // 第8-9天的恐怖事件日志
+        if (this.gameTime.day === 8 || this.gameTime.day === 9) {
+            summary += `\n<span style="color: #ff0000">WARNING: Anomaly Detected in Bathroom
+- Unknown entity detected
+- Bathroom access restricted
+- Entity showing signs of hostility
+- Exercise extreme caution</span>\n`;
+        }
 
         // 第11天的异常日志（两个分支都显示）
         if (this.gameTime.day === 11) {
