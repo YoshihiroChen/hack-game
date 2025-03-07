@@ -125,6 +125,9 @@ class Game {
         } else if (command.toLowerCase().startsWith('test.')) {
             cmd = 'test.day';
             args = command.slice(5);
+        } else if (command.toLowerCase().startsWith('debug(')) {  // 添加debug命令的特殊处理
+            cmd = 'debug';
+            args = command.slice(6, -1).trim();  // 提取括号中的内容
         } else {
             cmd = command.replace(/[()]/g, '').toLowerCase();
         }
@@ -226,6 +229,16 @@ class Game {
             case 'stab':
                 this.stabAction();
                 break;
+            case 'debug':
+                this.debug(args);  // 直接使用提取的参数
+                break;
+            case 'exit':
+                if (this.gameTime.day === 14 && this.storyBranch === 'hide') {
+                    this.showEndingCredits();
+                } else {
+                    this.log('ERROR', 'Cannot exit system at this time');
+                }
+                break;
             default:
                 this.log('ERROR', `Unknown command: ${cmd}`);
         }
@@ -257,8 +270,9 @@ class Game {
         // 创建地图副本
         let currentMap = [...this.map];
         
-        // 第8-9天时修改浴室的显示
-        if (this.gameTime.day >= 8 && this.gameTime.day <= 9) {
+        // 第8-9天或分支一的第12-13天时修改浴室的显示
+        if ((this.gameTime.day >= 8 && this.gameTime.day <= 9) || 
+            (this.storyBranch === 'hide' && this.gameTime.day >= 12 && this.gameTime.day <= 13 && this.bathroomEntityActive)) {
             const line = currentMap[2];
             const bathroomStart = line.lastIndexOf('[=]');
             const beforeBathroom = line.substring(0, bathroomStart);
@@ -446,12 +460,20 @@ class Game {
     }
 
     movePlayer(location) {
-        if (this.physicalBodyMissing && location === 'DESK') {
+        // 分支二：第12天不能移动到desk
+        if (this.storyBranch === 'lock' && this.physicalBodyMissing && location === 'DESK') {
             this.log('ERROR', 'Physical body not found');
             this.log('SYSTEM', 'Try using scan() at DESK');
             return;
         }
-        
+
+        // 分支一：第12-13天不能进入bathroom和shower
+        if (this.bathroomEntityActive && (location === 'SHOWER' || location === 'BATHROOM')) {
+            this.log('ERROR', 'ACCESS DENIED');
+            this.log('ERROR', 'The bathroom door appears to be locked from the inside...');
+            return;
+        }
+
         this.log('SYSTEM', `Attempting to move to: ${location}`);
         
         if (!location) {
@@ -560,8 +582,10 @@ class Game {
             return;
         }
 
-        // 第12天可以直接睡觉
-        if (this.gameTime.day === 12 && this.storyBranch === 'lock') {
+        // 分支一：第12天和完成debug后的第13天可以直接睡觉
+        if (this.storyBranch === 'hide' && 
+            ((this.gameTime.day === 12) || 
+             (this.gameTime.day === 13 && this.allDebugCompleted))) {
             this.log('SYSTEM', 'Going to sleep...');
             setTimeout(() => {
                 this.showDayEndModal();
@@ -569,17 +593,19 @@ class Game {
             return;
         }
 
-        // 检查是否完成所有任务
-        const allTasksCompleted = this.tasks.every(task => task.completed);
-        if (!allTasksCompleted && !this.physicalBodyMissing) {
-            this.log('ERROR', 'Must complete all tasks before sleeping');
+        // 分支二：第12天在找到两个线索后可以直接睡觉
+        if (this.storyBranch === 'lock' && this.gameTime.day === 12 && this.clueFound === 2) {
+            this.log('SYSTEM', 'Going to sleep...');
+            setTimeout(() => {
+                this.showDayEndModal();
+            }, 3000);
             return;
         }
 
-        // 检查是否有未完成的任务
-        const uncompletedTasks = this.tasks.filter(task => !task.completed);
-        if (uncompletedTasks.length > 0) {
-            this.log('ERROR', 'Cannot sleep yet. You still have uncompleted tasks!');
+        // 其他情况需要完成所有任务
+        const allTasksCompleted = this.tasks.every(task => task.completed);
+        if (!allTasksCompleted) {
+            this.log('ERROR', 'Must complete all tasks before sleeping');
             return;
         }
 
@@ -623,11 +649,12 @@ class Game {
     scanSurroundings() {
         if (this.physicalBodyMissing) {
             if (this.state.position === 'DESK' && this.clueFound === 0) {
-                this.log('WARNING', '(1/2) Find me, I am where I was');  // 使用WARNING类型会显示为黄色
+                this.log('WARNING', '(1/2) Find me, I am where I was');
                 this.clueFound = 1;
                 return;
             } else if (this.state.position === 'SHOWER' && this.clueFound === 1) {
-                this.log('WARNING', '(2/2) Who are you?');  // 使用WARNING类型会显示为黄色
+                this.log('WARNING', '(2/2) Who are you?');
+                this.clueFound = 2;  // 设置为2表示找到了两个线索
                 setTimeout(() => {
                     this.log('SYSTEM', 'You feel tired. You need to sleep.');
                     this.needCheckBody = false;  // 允许直接睡觉
@@ -805,11 +832,21 @@ class Game {
     }
 
     watchTV() {
-        if (!this.checkStateForAction('watchtv')) return;
-        if (this.state.position !== 'SOFA') {  // 只检查是否在沙发位置
-            this.log('ERROR', 'Must be at SOFA to watch television');
+        if (this.state.position !== 'SOFA') {
+            this.log('ERROR', 'Must be at SOFA to watch TV');
             return;
         }
+
+        if (this.storyBranch === 'hide') {
+            if (this.gameTime.day === 12) {
+                this.log('SYSTEM', 'debug()');
+            } else if (this.gameTime.day === 13) {
+                this.log('SYSTEM', 'Use debug() on anomalous locations');
+                this.log('SYSTEM', 'Example: debug(location)');
+            }
+            return;
+        }
+
         this.log('SYSTEM', 'Watching TV while relaxing on the sofa...');
         setTimeout(() => {
             this.state.sanity = Math.min(100, this.state.sanity + 15);
@@ -1082,32 +1119,11 @@ class Game {
             "E̷R̷R̷O̷R̷_̷4̷0̷4̷",
             "D̸E̸L̸E̸T̸E̸_̸A̸L̸L̸_̸T̸R̸A̸C̸E̸S̸",
             "C̷̨̭̘̲͎̅͌͑͝O̶͉̦͋̈́̈́͝R̸̡͚̲̆̈́̈́R̵͙̫̆̓U̷̢͇̇̈́P̷̱͉̏̓̈́T̴͎̫̏_̷͇̇D̷͚̆A̷̛͚T̷̫͌A̷͚̐",
-            "U̷̧͉̼͇͎͍͔̝͊̃͜N̴̢̧̛̺̱̱̗̩̱̫̈́̈́̈́̈̊̈́̕K̷̡̢̛͚̣͚̱̭̲̈́̈́̈́̈́̈́͜N̴̢̛̺̱̱̗̩̱̫̈́̈́̈̊̈́̕O̷̧͉̼͇͎͍͔̝͊̃͜W̷̧͉̼͇͎͍͔̝͊̃͜N̴̢̧̛̺̱̱̗̩̱̫̈́̈́̈̈̊̈́̕"
+            "U̷̧͉̼͇͎͍͔̝͊̃͜N̴̢̧̛̺̱̱̗̩̱̫̈́̈́̈̈̊̈́̕K̷̡̢̛͚̣͚̱̭̲̈́̈́̈́̈́̈́͜N̴̢̛̺̱̱̗̩̱̫̈́̈́̈̊̈́̕O̷̧͉̼͇͎͍͔̝͊̃͜W̷̧͉̼͇͎͍͔̝͊̃͜N̴̢̧̛̺̱̱̗̩̱̫̈́̈́̈̈̊̈́̕"
         ];
 
         // 选择使用哪个任务池
         const workTasks = this.gameTime.day >= 7 ? abnormalWorkTasks : normalWorkTasks;
-
-        // 家务任务池
-        let houseworkTasks = [
-            { description: "Do laundry", location: "WASHER", action: "washClothes" },
-            { description: "Change clothes", location: "WARDROBE", action: "changeClothes" },
-            { description: "Water the plants", location: "PLANTS", action: "waterPlants" }
-        ];
-
-        // 只在非第8-9天添加淋浴任务
-        if (this.gameTime.day < 8 || this.gameTime.day > 9) {
-            houseworkTasks.push({ description: "Take a shower", location: "SHOWER", action: "shower" });
-        }
-
-        // 从第二天开始添加打扫任务
-        if (this.gameTime.day >= 2) {
-            houseworkTasks.push({ 
-                description: "Clean the floor", 
-                location: "FLOOR", 
-                action: "cleanfloor" 
-            });
-        }
 
         // 随机选择2-3个工作任务
         const selectedWorkTasks = this.shuffleArray(workTasks)
@@ -1121,17 +1137,26 @@ class Game {
                 completed: false
             }));
 
-        // 固定选择3个家务任务
-        const selectedHouseworkTasks = this.shuffleArray(houseworkTasks)
-            .slice(0, 3)  // 改为固定选择3个
-            .map((task, id) => ({
-                id: id + selectedWorkTasks.length + 1,
-                description: task.description,
-                location: task.location,
-                action: task.action,
-                type: "housework",
-                completed: false
-            }));
+        // 家务任务池
+        const houseworkTasks = [
+            { description: "Do laundry", location: "WASHER", action: "washClothes" },
+            { description: "Clean the floor", location: "FLOOR", action: "cleanfloor" }
+        ];
+
+        // 只在非第8-9天和非分支一的第12-13天添加淋浴任务
+        const skipShowerTask = (this.gameTime.day >= 8 && this.gameTime.day <= 9) || 
+                              (this.storyBranch === 'hide' && this.gameTime.day >= 12 && this.gameTime.day <= 13);
+        
+        if (!skipShowerTask) {
+            houseworkTasks.push({ description: "Take a shower", location: "SHOWER", action: "shower" });
+        }
+
+        const selectedHouseworkTasks = houseworkTasks.map((task, id) => ({
+            id: id + selectedWorkTasks.length + 1,
+            ...task,
+            type: "housework",
+            completed: false
+        }));
 
         this.tasks = [...selectedWorkTasks, ...selectedHouseworkTasks];
         this.updateTasksDisplay();
@@ -1225,50 +1250,39 @@ class Game {
     }
 
     generateDaySummary() {
-        const completedWork = this.tasks.filter(t => t.completed && t.type === 'work').length;
-        const totalWork = this.tasks.filter(t => t.type === 'work').length;
-        const completedHousework = this.tasks.filter(t => t.completed && t.type === 'housework').length;
-        const totalHousework = this.tasks.filter(t => t.type === 'housework').length;
-
-        let summary = `Day ${this.gameTime.day} Summary:
-        
-Tasks Completed:
-- Work Tasks: ${completedWork}/${totalWork}
-- Housework Tasks: ${completedHousework}/${totalHousework}
-Total Time Spent: ${this.calculateWorkTime()} hours
-
-Current Status:
+        let summary = `Day ${this.gameTime.day} Summary\n`;
+        summary += `Work time: ${this.calculateWorkTime()} hours\n`;
+        summary += `Status:
 - Health: ${this.state.health}%
 - Hunger: ${this.state.hunger}%
 - Clean: ${this.state.clean}%
 - Sanity: ${this.state.sanity}%\n`;
 
-        // 添加恐怖事件日志
-        if (this.gameTime.day === 8 || this.gameTime.day === 9) {
-            summary += `\n<span style="color: #ff0000">WARNING: Anomaly Detected in Bathroom
-- Unknown entity detected
-- Bathroom access restricted
-- Entity showing signs of hostility
-- Exercise extreme caution</span>\n`;
-        } else if (this.gameTime.day === 6) {
+        // 第11天的异常日志（两个分支都显示）
+        if (this.gameTime.day === 11) {
             summary += `\n<span style="color: #ffff00">Anomalies Detected:
 - Soul initialization error occurred
 - Unexpected starting position: KITCHEN
 - System reported location mismatch
 - Investigation of the anomaly is ongoing</span>\n`;
-        } else if (this.gameTime.day === 12 && this.storyBranch === 'lock') {
+        }
+        
+        // 分支一：第12天的恐怖事件
+        if (this.gameTime.day === 12 && this.storyBranch === 'hide') {
+            summary += `\n<span style="color: #ff0000">WARNING: Critical System Error
+- Unknown entity detected in bathroom
+- Bathroom access restricted
+- Entity showing increased hostility
+- Emergency protocols activated</span>\n`;
+        }
+        
+        // 分支二：第12天的恐怖事件
+        if (this.gameTime.day === 12 && this.storyBranch === 'lock') {
             summary += `\n<span style="color: #ff0000">WARNING: Critical System Error
 - Physical body missing from desk
 - Unknown messages detected
 - System stability severely compromised
 - Emergency protocols initiated
-- Further investigation required</span>\n`;
-        } else if (this.gameTime.day >= 7 && this.gameTime.day !== 10 && this.gameTime.day !== 12) {  // 添加条件，排除第10天和第12天
-            summary += `\n<span style="color: #ffff00">Anomalies Detected:
-- System corruption detected
-- Work task data corrupted
-- Unexpected soul location at day start: KITCHEN
-- Entity interference level increasing
 - Further investigation required</span>\n`;
         }
 
@@ -1288,6 +1302,14 @@ Current Status:
             }
         }
 
+        if (this.gameTime.day === 13 && this.storyBranch === 'hide') {
+            summary += `\n<span style="color: #00ff00">System Status Report:
+- All errors have been corrected
+- System restored to normal operation
+- Debug process completed successfully
+- Ready for final termination</span>\n`;
+        }
+
         summary += '\nPress any key to continue...';
         return summary;
     }
@@ -1297,8 +1319,37 @@ Current Status:
         this.gameTime.hour = 9;
         this.gameTime.minute = 0;
         
-        if (this.storyBranch === 'lock') {  // 分支二的特殊处理
-            if (this.gameTime.day === 12) {
+        if (this.storyBranch === 'hide') {  // 分支一的特殊处理
+            if (this.gameTime.day === 11) {
+                this.state.position = 'KITCHEN';  // 第11天在厨房醒来
+                this.log('WARNING', 'ERROR: Wrong location');
+                this.log('WARNING', 'Soul initialization failed - unexpected starting position');
+            } else if (this.gameTime.day === 12) {
+                this.state.position = 'BED';
+                this.bathroomEntityActive = true;  // 浴室实体再次出现
+                setTimeout(() => {
+                    this.log('SYSTEM', 'The TV seems to have been turned on by someone');
+                }, 1000);
+            } else if (this.gameTime.day === 13) {
+                this.state.position = 'BED';
+                this.bathroomEntityActive = true;  // 浴室实体继续存在
+                this.debugLocations = ['SHOWER', 'KITCHEN', 'DESK'];  // 需要debug的位置
+                setTimeout(() => {
+                    this.log('SYSTEM', 'The TV is on again');
+                }, 1000);
+            } else if (this.gameTime.day === 14) {
+                this.state.position = 'BED';
+                setTimeout(() => {
+                    this.log('SYSTEM', 'All tasks have been completed');
+                    this.log('SYSTEM', 'Type exit() to terminate the system');
+                }, 1000);
+            }
+        } else if (this.storyBranch === 'lock') {
+            if (this.gameTime.day === 11) {
+                this.state.position = 'KITCHEN';  // 第11天在厨房醒来
+                this.log('WARNING', 'ERROR: Wrong location');
+                this.log('WARNING', 'Soul initialization failed - unexpected starting position');
+            } else if (this.gameTime.day === 12) {
                 this.state.position = 'DESK';
                 this.physicalBodyMissing = true;  // 添加标记表示本体消失
                 this.clueFound = 0;  // 用于追踪找到的线索数量
@@ -1310,8 +1361,12 @@ Current Status:
                     this.log('WARNING', 'Grab the knife');
                     this.log('WARNING', 'Type grab() to take the knife');
                 }, 1000);
-            } else if (this.gameTime.day === 11) {
-                this.state.position = 'KITCHEN';  // 第11天在厨房醒来
+            } else if (this.gameTime.day === 14) {
+                this.state.position = 'BED';
+                setTimeout(() => {
+                    this.log('SYSTEM', 'All tasks have been completed');
+                    this.log('SYSTEM', 'Type exit() to terminate the system');
+                }, 1000);
             }
         } else if (this.gameTime.day === 10) {
             this.state.position = 'BED';  // 第十天在床上醒来
@@ -1580,7 +1635,7 @@ Current Status:
             { text: 'Exit()', color: '#00ff00', isLast: true }
         ];
 
-        // 先等待2秒后开始黑屏
+        // 等待2秒后开始黑屏
         setTimeout(() => {
             document.body.style.backgroundColor = '#000';
             document.body.innerHTML = '';
@@ -1593,10 +1648,121 @@ Current Status:
                 let index = 0;
                 const showNextLine = () => {
                     if (index >= creditLines.length) {
-                        // 最后一行显示完2秒后关闭游戏
                         setTimeout(() => {
-                            window.close();  // 尝试关闭窗口
-                            // 如果window.close()不起作用，至少清空页面
+                            document.body.innerHTML = '';
+                        }, 2000);
+                        return;
+                    }
+                    
+                    const line = creditLines[index];
+                    credits.innerHTML = `<div class="credit-line" style="color: ${line.color}">${line.text}</div>`;
+                    
+                    // 显示当前行2秒
+                    setTimeout(() => {
+                        credits.innerHTML = '';  // 清空
+                        // 等待2秒后显示下一行
+                        setTimeout(() => {
+                            index++;
+                            showNextLine();
+                        }, 2000);
+                    }, 2000);
+                };
+
+                showNextLine();
+            }, 3000);
+        }, 2000);
+    }
+
+    // 添加debug方法
+    debug(location) {
+        if (this.gameTime.day !== 13 || this.storyBranch !== 'hide') {
+            this.log('ERROR', 'Debug function not available');
+            return;
+        }
+
+        if (!this.debugLocations.includes(location.toUpperCase())) {
+            this.log('ERROR', 'No debug required at this location');
+            return;
+        }
+
+        setTimeout(() => {
+            switch(location.toUpperCase()) {
+                case 'SHOWER':
+                    this.bathroomEntityActive = false;  // 移除红色闪烁的@
+                    this.state.position = 'SHOWER';     // 移动到shower
+                    this.updateMap();                   // 更新地图显示
+                    this.log('WARNING', 'Who are you?');
+                    setTimeout(() => {
+                        this.log('SYSTEM', 'Error corrected at SHOWER');
+                        this.debugLocations = this.debugLocations.filter(l => l !== 'SHOWER');
+                    }, 2000);
+                    break;
+
+                case 'KITCHEN':
+                    this.state.position = 'KITCHEN';    // 移动到kitchen
+                    this.updateMap();
+                    this.log('WARNING', 'You were saving yourself.');
+                    setTimeout(() => {
+                        this.log('SYSTEM', 'Error corrected at KITCHEN');
+                        this.debugLocations = this.debugLocations.filter(l => l !== 'KITCHEN');
+                    }, 2000);
+                    break;
+
+                case 'DESK':
+                    this.state.position = 'DESK';       // 移动到desk
+                    this.updateMap();
+                    this.log('WARNING', 'You should be free.');
+                    setTimeout(() => {
+                        this.log('SYSTEM', 'Error corrected at DESK');
+                        this.debugLocations = this.debugLocations.filter(l => l !== 'DESK');
+                    }, 2000);
+                    break;
+            }
+
+            // 检查是否所有debug都完成了
+            const remainingDebug = this.debugLocations.filter(l => l !== location.toUpperCase());
+            if (remainingDebug.length === 0) {
+                setTimeout(() => {
+                    this.log('SYSTEM', 'All debug tasks completed');
+                    setTimeout(() => {
+                        this.log('SYSTEM', 'You feel tired. You need to sleep.');
+                        this.needCheckBody = false;
+                        this.allDebugCompleted = true;
+                    }, 2000);
+                }, 3000);
+            }
+            this.debugLocations = remainingDebug;
+        }, 2000);
+    }
+
+    // 添加结束动画方法
+    showEndingCredits() {
+        // 创建片尾容器
+        const credits = document.createElement('div');
+        credits.className = 'credits';
+        
+        // 片尾信息数组
+        const creditLines = [
+            { text: 'First Work of Yoshihiro Chen', color: '#00ff00' },
+            { text: 'Designer: Yoshihiro Chen', color: '#00ff00' },
+            { text: 'Who are you?', color: '#ffff00' },
+            { text: 'Exit()', color: '#00ff00', isLast: true }
+        ];
+
+        // 等待2秒后开始黑屏
+        setTimeout(() => {
+            document.body.style.backgroundColor = '#000';
+            document.body.innerHTML = '';
+            
+            // 黑屏持续3秒后开始显示片尾
+            setTimeout(() => {
+                document.body.appendChild(credits);
+                
+                // 开始显示片尾
+                let index = 0;
+                const showNextLine = () => {
+                    if (index >= creditLines.length) {
+                        setTimeout(() => {
                             document.body.innerHTML = '';
                         }, 2000);
                         return;
