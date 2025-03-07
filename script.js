@@ -1260,6 +1260,13 @@ class Game {
 - Clean: ${this.state.clean}%
 - Sanity: ${this.state.sanity}%\n`;
 
+        // 第4天的恐怖事件日志
+        if (this.gameTime.day === 4) {
+            summary += `\n<span style="color: #ffff00">Anomalies Detected:
+- System reported location mismatch
+- Investigation of the anomaly is ongoing</span>\n`;
+        }
+
         // 第8-9天的恐怖事件日志
         if (this.gameTime.day === 8 || this.gameTime.day === 9) {
             summary += `\n<span style="color: #ff0000">WARNING: Anomaly Detected in Bathroom
